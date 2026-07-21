@@ -1,0 +1,20 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "ember-toolkit",
+  "description": "Sara LaFleur's source-of-truth marketplace for her Claude Code skills and agents, grouped into installable plugins.",
+  "owner": {
+    "name": "Sara LaFleur",
+    "email": "saralafleur47@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "delivery-team",
+      "description": "Five virtual delivery teams (intake, qa, build, release, status) that run a request through plan -> test -> build -> release, plus a read-only status reconciler.",
+      "author": {
+        "name": "Sara LaFleur"
+      },
+      "category": "productivity",
+      "source": "./plugins/delivery-team"
+    }
+  ]
+}
