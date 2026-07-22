@@ -15,6 +15,15 @@
       },
       "category": "productivity",
       "source": "./plugins/delivery-team"
+    },
+    {
+      "name": "librarian",
+      "description": "The team librarian — curates durable knowledge into a shared, growing library so repeat work approaches one-shot. Organizes knowledge by domain/subdomain/topic with retrieval descriptions, keeps a single Table of Contents, audits its own descriptions and itself for thrashing, and gates every write behind human approval.",
+      "author": {
+        "name": "Sara LaFleur"
+      },
+      "category": "productivity",
+      "source": "./plugins/librarian"
     }
   ]
 }
