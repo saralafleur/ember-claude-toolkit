@@ -1,6 +1,6 @@
 ---
 name: sanitize-plugins
-argument-hint: '[plugin-name] — defaults to every plugin under plugins/ with changes since its last published tag'
+argument-hint: '[plugin-name(s) | all] — omit when calling this interactively to be asked; a caller invoking this from another script must always pass an explicit scope, never call it bare'
 description: >
   Pre-publish privacy/IP/secrets gate for this repo (ember-claude-toolkit).
   Runs a team of scanner subagents over a plugin's content before it is
@@ -40,14 +40,27 @@ a separate, explicit step afterward.
 > parallel — send them in a single message with multiple Agent tool calls.
 
 ## Step 1 — Scope
-Determine which plugin(s) to scan:
-- If an argument names a plugin, scope to `plugins/<name>/` only.
-- Otherwise, scope to every plugin under `plugins/` that has uncommitted
-  changes OR no commits since its last `<name>--v*` git tag (a brand-new,
-  never-tagged plugin counts as fully in scope). Reuse the same
-  change-detection logic as `refresh-plugins`' `scripts/check.sh` rather than
-  re-deriving it.
-- If nothing is in scope, report that and stop — there's nothing to sanitize.
+
+**If an argument was given** (one plugin name, several, or the literal `all`):
+scope to exactly that — no prompt, no auto-detection, no second-guessing the
+caller. This is the path any other script/skill (e.g. `refresh-plugins`) MUST
+use: a caller invoking this skill from within its own flow always passes its
+own already-determined scope explicitly. Never invoke this skill bare from
+inside another script — an unattended prompt would stall that flow.
+
+**If no argument was given** (a direct, interactive `/sanitize-plugins`
+invocation with nothing after it): this is the only case where you ask.
+Determine the candidate list — every plugin under `plugins/` that has
+uncommitted changes OR no commits since its last `<name>--v*` git tag counts
+as "changed" (reuse `refresh-plugins`' `scripts/check.sh` change-detection
+rather than re-deriving it); every other plugin under `plugins/` is a
+candidate too, just not pre-selected. Then use `AskUserQuestion` to ask which
+to sanitize, offering: each changed plugin individually, an "all changed
+plugins" option, and an "all plugins regardless of change state" option. Scope
+to whatever was picked.
+
+If the resolved scope (from either path) is empty, report that and stop —
+there's nothing to sanitize.
 
 ## Step 2 — Sweep (parallel finders)
 For each plugin in scope, run all five finder agents in parallel, each given:
