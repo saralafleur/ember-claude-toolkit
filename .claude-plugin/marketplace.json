@@ -33,6 +33,15 @@
       },
       "category": "productivity",
       "source": "./plugins/time-ledger"
+    },
+    {
+      "name": "dev-workflow",
+      "description": "Two repo-level workflow skills: wrap-up (close out a unit of work — audit, human gate, commit, push, merge, clean up) and create-skill-devops (scaffold a project-scoped /devops toolbox for build-environment setup).",
+      "author": {
+        "name": "Sara LaFleur"
+      },
+      "category": "productivity",
+      "source": "./plugins/dev-workflow"
     }
   ]
 }
