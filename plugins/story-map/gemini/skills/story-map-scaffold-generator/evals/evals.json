@@ -1,0 +1,109 @@
+{
+  "skill_name": "story-map-scaffold-generator",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I need to set up a story map for UAT testing of our new grants management app. The codebase is at /projects/grants-app and uses Vue Router. The test environment is at http://localhost:3000. We have three roles: Applicant, Program Officer, and System Admin. UAT cycle is called UAT-2026-Q2, running May 28 to June 11, test lead is Maria Chen. We don't have a formal scope doc yet, but everything should be in scope. Can you scaffold the full story map folder structure?",
+      "expected_output": "A complete story-map/ directory with: 00-index.md, 01-scope-decisions.md, 02-uat-run-sheet.md, .env, lessons-learned-in-running-story-map.md; shared/ folder with route-url-map.md, uat-bootstrap-setup.md, happy-path-template.md, edge-case-template.md; roles/ folder with subdirectories for applicant, program-officer, system-admin each with index.md and workflow subdirectories; status/ folder with status.md, data-manifest.md, schema.md, failures/FAILURE-TEMPLATE.md; prompts/ folder with both agent prompt files and uat-tagging-field-matrix.md. All happy-path.md files must be fully populated with real steps, not stubs.",
+      "assertions": [
+        {
+          "text": "Creates story-map/00-index.md with Document Map, Prompt Invocation, and Roles sections",
+          "type": "file_content"
+        },
+        {
+          "text": "Creates role directories for all three roles: applicant, program-officer, system-admin",
+          "type": "file_structure"
+        },
+        {
+          "text": "Each role directory contains an index.md and at least one workflow subfolder",
+          "type": "file_structure"
+        },
+        {
+          "text": "Each workflow folder contains summary.md, happy-path.md, and edge-cases.md",
+          "type": "file_structure"
+        },
+        {
+          "text": "story-map/02-uat-run-sheet.md includes cycle name UAT-2026-Q2, test lead Maria Chen, and environment URL http://localhost:3000",
+          "type": "file_content"
+        },
+        {
+          "text": "story-map/prompts/story-map-playwright-mcp-uat-agent.prompt.md is generated and references the actual story-map file paths",
+          "type": "file_content"
+        },
+        {
+          "text": "story-map/status/status.md is initialized with NOT-RUN status for all in-scope workflows",
+          "type": "file_content"
+        },
+        {
+          "text": "Agent asks for confirmation after discovery before writing files (or at minimum presents what it discovered)",
+          "type": "behavior"
+        }
+      ],
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "We're about to start UAT on a healthcare portal that has two portals: a Patient Portal and a Provider Portal. The app is running at https://uat.healthportal.example.com. I have a scope doc that lists: Patient registration (in scope), Patient appointment booking (in scope), Provider schedule management (in scope), Provider billing (deferred), Admin user management (not approved). Route config is in src/router/index.ts. UAT cycle: UAT-Healthcare-May2026, dates May 29 to June 5, test lead is Dr. Patel. Please create the full story map scaffold.",
+      "expected_output": "A complete story-map/ with proper handling of the mixed scope: in-scope workflows get full summary/happy-path/edge-cases treatment; billing gets marked DEFERRED with summary.md only; admin user management gets NOT-APPROVED. The 01-scope-decisions.md should have a proper table with all 5 workflows and their scope tags. The 02-uat-run-sheet.md tracker should only show NOT-RUN rows for in-scope items and DEFERRED for billing.",
+      "assertions": [
+        {
+          "text": "01-scope-decisions.md contains rows for all 5 workflows with correct scope tags (IN-SCOPE, DEFERRED, NOT-APPROVED)",
+          "type": "file_content"
+        },
+        {
+          "text": "DEFERRED workflow (billing) has at least a summary.md but no happy-path.md or edge-cases.md attempted",
+          "type": "file_structure"
+        },
+        {
+          "text": "NOT-APPROVED workflow (admin user management) is not included as a runnable test workflow",
+          "type": "file_content"
+        },
+        {
+          "text": "02-uat-run-sheet.md shows DEFERRED status (not NOT-RUN) for billing workflow",
+          "type": "file_content"
+        },
+        {
+          "text": "happy-path.md files for in-scope workflows reference real URLs under https://uat.healthportal.example.com",
+          "type": "file_content"
+        },
+        {
+          "text": "Each in-scope happy-path.md has a field/input checklist with at least 3 rows and a manual steps table with at least 3 steps",
+          "type": "file_content"
+        }
+      ],
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "I want to scaffold a story map for our internal project tracking tool. It's a Next.js app. There are two roles: Project Manager and Team Member. Base URL is http://localhost:4000. Cycle: UAT-Tracker-v1, May 2026, test lead is Alex. The router config is in app/ directory using Next.js App Router conventions. I haven't figured out the exact scope yet — just make everything in scope and I'll refine later.",
+      "expected_output": "Agent should first ask clarifying questions about: start/end dates (not provided), and ideally confirm what workflows it discovers. Then produces the full scaffold with both roles' workflows marked IN-SCOPE with a note that scope review is pending. The bootstrap setup should reflect a plausible dependency chain for a project tracking tool (e.g., PM creates project before team member can log time).",
+      "assertions": [
+        {
+          "text": "Agent asks about missing start/end dates before generating files",
+          "type": "behavior"
+        },
+        {
+          "text": "All generated workflows are marked IN-SCOPE with a note indicating scope review is pending",
+          "type": "file_content"
+        },
+        {
+          "text": "shared/uat-bootstrap-setup.md Bootstrap Execution Order respects workflow dependency chain (e.g., project creation before task assignment)",
+          "type": "file_content"
+        },
+        {
+          "text": "story-map/.env stub file exists with DB connection placeholders",
+          "type": "file_structure"
+        },
+        {
+          "text": "story-map/lessons-learned-in-running-story-map.md exists as an empty template file",
+          "type": "file_structure"
+        },
+        {
+          "text": "story-map/status/failures/FAILURE-TEMPLATE.md exists with proper failure record template",
+          "type": "file_content"
+        }
+      ],
+      "files": []
+    }
+  ]
+}

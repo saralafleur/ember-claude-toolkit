@@ -1,0 +1,5 @@
+{
+  "name": "delivery-team",
+  "version": "1.0.0",
+  "description": "Five virtual delivery teams (intake, qa, build, release, status) that run a request through plan -> test -> build -> release, plus a read-only status reconciler."
+}

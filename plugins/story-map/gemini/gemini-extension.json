@@ -1,0 +1,5 @@
+{
+  "name": "story-map",
+  "version": "1.0.0",
+  "description": "Scaffolds a complete, populated UAT story map for an application — discovers roles, workflows, and routes from the codebase, then generates a full role-first test folder tree (happy paths, edge cases, run sheet, scope matrix) plus ready-to-run Playwright MCP UAT execution and status-reset agent prompts."
+}

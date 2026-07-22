@@ -181,8 +181,8 @@ contrast is the point, not noise to average away.
 - **Cost is an estimate**, priced from local token usage against published
   API rates. If billing is via a Claude subscription rather than pay-per-token,
   treat it as "value consumed," not an invoice. Pricing table in
-  `scripts/rollup.py` (`PRICING` dict) should be checked against
-  `shared/models.md` in the `claude-api` skill periodically — it will drift.
+  `scripts/rollup.py` (`PRICING` dict) should be checked periodically
+  against current published model pricing, since it will drift.
 - **Branch attribution is only as good as `gitBranch` in the transcript.**
   Projects where the working-tree root isn't the actual git repo (e.g. a
   project where the git repo root is a nested sub-directory rather than the

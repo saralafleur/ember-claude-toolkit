@@ -1,6 +1,6 @@
 ---
 name: librarian
-description: 'The team librarian — curates DURABLE knowledge into a shared, growing library so repeat work approaches one-shot. Use when: you want to capture what was learned in a conversation (how a system works, how we accomplished something with Playwright/the archive utility, architectural decisions and direction, how a solution solved a problem, style/UI conventions, best practices); you want to audit and improve the library''s descriptions so the right knowledge actually loads; you want to wire a repo''s CLAUDE.md to the library; or you want to set up / point a repo at the library. Organizes knowledge by domain/subdomain/topic with retrieval descriptions, keeps a single Table of Contents, audits its own descriptions AND itself for thrashing, and gates every write behind human approval.'
+description: 'The team librarian — curates DURABLE knowledge into a shared, growing library so repeat work approaches one-shot. Use when: you want to capture what was learned in a conversation (how a system works, how we accomplished something with a testing framework/CLI tool, architectural decisions and direction, how a solution solved a problem, style/UI conventions, best practices); you want to audit and improve the library''s descriptions so the right knowledge actually loads; you want to wire a repo''s CLAUDE.md to the library; or you want to set up / point a repo at the library. Organizes knowledge by domain/subdomain/topic with retrieval descriptions, keeps a single Table of Contents, audits its own descriptions AND itself for thrashing, and gates every write behind human approval.'
 argument-hint: 'A mode: `capture` (default), `audit`, `wire-up [repo path]`, or `setup`. Optional.'
 ---
 
@@ -12,7 +12,7 @@ activity, the right knowledge loads and we get close to one-shot.
 
 This skill is an **orchestration**: you (the main agent) run the phases and
 delegate to subagents. You own the **human approval gate** — nothing is written
-to the library or to the librarian's own files without Sara's approval.
+to the library or to the librarian's own files without the user's approval.
 
 ## The team (first-class agents shipped alongside this skill)
 | Agent | Role | Writes? |
@@ -43,11 +43,11 @@ this `SKILL.md`.
 Read `config/library-locations.json`, in the `config/` folder next to this
 `SKILL.md`.
 🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
-- If `libraries` is **empty → first-run setup**: STOP and ask Sara *"Where should
+- If `libraries` is **empty → first-run setup**: STOP and ask the user *"Where should
   the library live?"* (absolute path). Then have `librarian-archivist` scaffold it
   there and register it. Do not invent a location.
 🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
-- If libraries exist but the **current repo has no binding**, ask Sara which
+- If libraries exist but the **current repo has no binding**, ask the user which
   registered library this repo should use (or declare a new one), and record the
   binding. Several repos may share one `libraryId` — that is how locations pool
   into one library.
@@ -62,7 +62,7 @@ Read `config/library-locations.json`, in the `config/` folder next to this
 🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
 2. **Human gate.** Present a high-level summary via `AskUserQuestion`: for each
    proposed entry — action (NEW / UPDATE \<id\>), domain/subdomain/topic, title,
-   and the proposed **description**; plus what was dropped. Let Sara
+   and the proposed **description**; plus what was dropped. Let the user
    approve / edit / reject **per item**.
 3. Run `librarian-archivist` with the **approved set only**. It commits entries,
    regenerates the TOC, and appends the audit rows (+ description-history on any
@@ -100,7 +100,7 @@ Archivist updates `config/library-locations.json`.
 At the end of a substantial work session (a system understood, a non-trivial
 capability built, a real architectural decision made), proactively offer:
 *"Want me to have the librarian capture what we learned here?"* — then run
-`capture` if Sara says yes. Don't nag on small/transient work.
+`capture` if the user says yes. Don't nag on small/transient work.
 
 ## Conventions
 - **Read-only proposers, single writer.** Curator and analyst never write to the
