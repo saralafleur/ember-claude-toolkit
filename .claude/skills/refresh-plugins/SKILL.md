@@ -26,7 +26,18 @@ the two cases where a refresh genuinely matters:
   discipline, and marketplace.json staying in sync with what's actually in
   `plugins/`.
 
-## 1. Audit (read-only)
+## 1. Sanitize (mandatory gate)
+
+Before anything else, run `/sanitize-plugins` scoped to whichever plugin(s)
+are in scope for this refresh. Do not proceed to Step 2 unless it returns
+**PASS**. If it returns **FAIL**, stop here, report exactly what's still
+open, and do not version-bump, tag, or push anything — a plugin does not get
+published with unresolved secrets, personal data, cross-project leakage,
+non-portable hardcoding, or personalized wording. This applies even to a
+plugin that's never been published before; "first publish" is not an
+exemption.
+
+## 2. Audit (read-only)
 
 Run the check script and read its output before doing anything else:
 
@@ -44,7 +55,7 @@ If validation fails for a plugin or the marketplace manifest, stop and fix
 the manifest before continuing — do not version-bump or tag a plugin that
 doesn't validate.
 
-## 2. Decide the version bump, per changed plugin
+## 3. Decide the version bump, per changed plugin
 
 Look at what actually changed (`git diff <last-tag>..HEAD -- plugins/<name>`,
 or the full diff if `last tag: none`) and pick a semver bump:
@@ -62,7 +73,7 @@ judgment call (new capability vs. just a refinement).
 Edit `plugins/<name>/.claude-plugin/plugin.json`'s `"version"` field to the
 new value.
 
-## 3. Keep marketplace.json in sync
+## 4. Keep marketplace.json in sync
 
 If this is a **new plugin folder** (not yet listed in
 `.claude-plugin/marketplace.json`), add an entry to the root manifest's
@@ -85,7 +96,7 @@ environment): a brand-new plugin needs a live symlink for her own use —
 `ln -s "$(pwd)/plugins/<plugin-name>" ~/.claude/skills/<plugin-name>` — so it
 loads as `<plugin-name>@skills-dir` next session.
 
-## 4. Commit and tag
+## 5. Commit and tag
 
 ```
 git add -A
@@ -98,7 +109,7 @@ claude plugin tag ./plugins/<plugin-name> -m "%s"
 cross-checks that `plugin.json` and the marketplace entry agree — if they've
 drifted, fix that before tagging, don't force past it.
 
-## 5. Push
+## 6. Push
 
 Only if a remote is configured (`git remote -v`). If none exists yet, tell
 Sara this plugin is committed and tagged locally but not published anywhere
@@ -109,7 +120,7 @@ git push origin main
 git push origin "<plugin-name>--v<version>"
 ```
 
-## 6. Refresh installed copies
+## 7. Refresh installed copies
 
 For any marketplace-install (not skills-dir) consumer of this repo,
 including Sara's own local test install of `ember-toolkit`:
