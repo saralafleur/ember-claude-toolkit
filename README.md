@@ -98,3 +98,44 @@ node scripts/install.mjs antigravity --all
 ## Publishing changes
 
 After editing anything under `plugins/<name>/`, run `/refresh-plugins` from this repo — it runs the `/sanitize-plugins` privacy/IP/secrets gate, validates the changed plugin(s) and `marketplace.json`, bumps semver, commits, tags, and pushes.
+
+## Wait, so does editing this repo update everyone instantly?
+
+**No — and the reason why trips people up.** A plugin marketplace can be wired up two completely different ways, and they behave nothing alike.
+
+### Picture two people looking at the same pot of soup
+
+- **You, the author**, register this repo as a `directory`-source marketplace (`/plugin marketplace add /path/to/ember-claude-toolkit`). Your working copy of the repo *is* the pot on the stove. Stir it — edit a file, save it — and the next `/reload-plugins` (or session restart), everyone eating from that install tastes the change. No copy sits in between.
+- **Someone who installs from GitHub** (`/plugin marketplace add saralafleur/ember-claude-toolkit`) gets a sealed jar instead. `/plugin install` clones the plugin's code *at that moment* into their own `~/.claude/plugins/cache/...`, pinned to a specific version. You can keep stirring your pot all day long — their jar doesn't change until they go get a new one.
+
+So: **your own edits are live immediately for you.** They reach anyone else only once you publish a new version *and* they pull it.
+
+### So how does someone else get a new jar?
+
+| Step | Command | What actually happens |
+|---|---|---|
+| 1 | `/plugin marketplace update ember-toolkit` | Refreshes the catalog — "a newer version is available" |
+| 2 | `claude plugin update <name>@ember-toolkit` | Pulls that new version into a fresh, separate cache folder |
+| 3 | *(restart the session)* | The new jar actually gets opened |
+
+**There are no dumb questions**
+
+*Q: If I never bump the version, will anyone else ever see my fix?*
+A: No. That's exactly why `/refresh-plugins` isn't optional busywork — it bumps semver and tags the commit that step 1 above is watching for. Skip it, and your fix sits in your working copy forever.
+
+*Q: I want my own copy to break things in without touching what's "for real" installed — do I end up with two of everything?*
+A: Only if you deliberately register a second marketplace. Otherwise, no — editing this one repo just updates the one install in place.
+1. Clone (or fork) the repo somewhere else — `git worktree add` works too.
+2. Rename `"name"` inside that copy's `.claude-plugin/marketplace.json` (it defaults to `ember-toolkit`, and two marketplaces can't share a name).
+3. `/plugin marketplace add /path/to/your-copy` → `/plugin install <name>@your-new-name`.
+
+Now you genuinely have two independent installs — e.g. `delivery-team@ember-toolkit` (stable) and `delivery-team@ember-toolkit-dev` (yours to break). `/plugin list` will show both. If any skill or command names collide between them, disable one side (`/plugin disable <name>@<marketplace>`) while testing the other — don't run both live at once.
+
+### Cheat sheet: who sees what, when
+
+| | You, editing this repo directly (`directory` source) | A consumer installing from GitHub (`github` source) |
+|---|---|---|
+| Install location | The repo's working copy — no cache | A versioned snapshot under `~/.claude/plugins/cache/` |
+| An edit goes live | Immediately, after `/reload-plugins` | Never, until they run `plugin update` |
+| Getting an update | N/A — you *are* the source | `marketplace update` → `plugin update` → restart |
+| Risk of seeing duplicates | Only if you register a second marketplace pointing at a second copy | Same — only from adding a second marketplace |
