@@ -53,6 +53,7 @@ delegate each role to a subagent. You are the release lead's editor.
 ### Step 0 — Establish the release scope (what shipped in this version)
 A release note is scoped to a **version**, which may bundle several work
 items.
+🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
 - Check `PROJECT-CONTEXT.md` for this project's version source of truth and
   where its delivery-pipeline artifacts (intake/build folders) live. If the
   user gave a version and/or folders, use them; otherwise ask: "What's in
@@ -62,6 +63,7 @@ items.
 - Enumerate the **work items** in the release: each item's intake/build
   folder and its `build-report.md`. Confirm each item was actually built (a
   green build-report), and gather the commit range per repo touched.
+🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
 - Do not invent scope. If it's unclear which items belong to this version,
   ask.
 
@@ -98,6 +100,7 @@ Summarize for the user in chat:
 - Confirmation the notes are **jargon-clean** and **version-correct**.
 - Links to `release-notes.md` (the deliverable) and `release-crosswalk.md`
   (internal).
+🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
 Then ask whether the user wants to send the notes, edit them, or hold.
 
 ## Decision logging
@@ -109,6 +112,24 @@ folder as `decisions.md`, and note it in the release-log row. Write PENDING
 before asking, DECIDED after.
 
 ## Conventions
+- **Human gates must be visible, not just asked.** At every 🟧 HUMAN GATE
+  REQUIRED point, present the question as its own standalone callout in the
+  actual chat reply — **include the literal `🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧`
+  banner line**, not just the blockquote underneath it:
+
+  > 🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
+  >
+  > **Human decision needed:** <the question>
+
+  Never fold a gate's question into a narrative summary paragraph where it
+  reads as background rather than a stop-and-wait point. If more than one gate
+  applies in the same report-back, each gets its own banner + callout — do not
+  merge them into a single generic "want me to proceed?".
+- **When a gate offers a choice in plain chat text (not via `AskUserQuestion`),
+  letter the options** — `**A)**`, `**B)**`, `**C)**`, etc. — so Sara can
+  answer with a single letter instead of re-describing the option. A gate
+  with only one path (a plain yes/no "proceed?") doesn't need lettering —
+  this is for genuine multi-way choices.
 - **Input:** a version label and/or the folders/builds it covers — provided
   by the user; the skill asks if omitted. Do not write notes without a
   confirmed scope.

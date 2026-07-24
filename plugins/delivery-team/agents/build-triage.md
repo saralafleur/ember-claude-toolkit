@@ -97,6 +97,17 @@ skip anything that assumes project-specific conventions.
        for some project-appropriate `base`), and apply that offset to every
        host-side port in the file, preserving the original file's *relative*
        port spacing between services. Leave container-side ports untouched.
+     - **Check for a cross-service value override registry.** If this
+       project's `PROJECT-CONTEXT.md` names one, read it. For each entry,
+       using the per-effort host-port you just assigned to
+       `derivedFrom.sourceService` in the previous sub-step, compute
+       `derivationRule` with `${SOURCE_PORT}` substituted, and write
+       `envVarName=<computed value>` into this effort's generated `.env`.
+       Then run the registry's paired verification script (also named in
+       `PROJECT-CONTEXT.md`) against the freshly generated compose file and
+       `.env`. A non-zero exit means this step failed — stop and surface it;
+       do not proceed to step 8 with an unverified per-effort stack. If the
+       project names no such registry, this sub-step is a no-op — proceed.
    - Write a `.env` alongside it setting the compose project name to the
      effort slug, so `docker compose -f <compose-file> up -d` gets its own
      containers/volumes/network namespace, isolated from any shared dev stack

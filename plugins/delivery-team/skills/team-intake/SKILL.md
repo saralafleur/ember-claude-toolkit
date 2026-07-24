@@ -59,6 +59,7 @@ subfolder).
   use it as the intake base folder. The request materials (ticket, email,
   doc, screenshots) live in this folder. (If they pointed at a single file
   instead, treat that file's parent folder as the base folder.)
+🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
 - **If no folder was given, STOP and ask:** "Which folder should I work in?
   Point me at the folder that holds the request — I'll create an `intake/`
   subfolder inside it for the plans."
@@ -74,6 +75,7 @@ subfolder).
 ### Step 2 — Triage (gate)
 Run `intake-triage` on the source → it writes `request-brief.md` and returns
 a `READY` / `BLOCKED` verdict.
+🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
 - If **BLOCKED**, surface its blocking questions to the user with
   `AskUserQuestion` (or plain text) and wait. **Do not run the rest of the
   team on a request nobody understands.**
@@ -105,13 +107,16 @@ Run `intake-tech-lead` with the brief, the three supporting files
 `technical-plan.md`.
 
 ### Step 6 — Report back
-Summarize for the user in the chat:
+Regenerate and (re)publish this initiative's SDLC journey artifact first
+(see "Time logging" below), then summarize for the user in the chat:
 - Request **type** and **"seen before?"** (cite the defect-catalog id if
   matched and this project has one configured).
 - The PM's headline recommendation (esp. the cycle-breaker if recurring).
 - The technical approach in 2–3 bullets.
 - Any **PENDING / PARKED decisions** still open (from `decisions.md`).
-- Links to `pm-plan.md`, `technical-plan.md`, and `decisions.md`.
+- Links to `pm-plan.md`, `technical-plan.md`, `decisions.md`, and the
+  journey artifact URL.
+🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
 Then ask whether to proceed to implementation (out of scope for this skill).
 
 ### Step 7 — Client approval sheet (optional, on demand)
@@ -143,7 +148,66 @@ if the user defers it to a stakeholder) once they answer. The PM reads the
 decision-log during history reconstruction, so a question answered once
 stays answered.
 
+## Time logging
+Every subagent Agent() call returns a `<usage>` block with `duration_ms` /
+`subagent_tokens` / `tool_uses` the instant it completes — this is real
+compute-time data that would otherwise vanish once the turn moves on, and it
+is the only record of how much work a background subagent actually did (main-
+loop session transcripts, which `time-ledger`'s cross-project dashboard reads,
+never see it). Persist it as you go:
+
+- **Right after every Agent() call's completion notification**, run:
+  ```
+  python3 ~/.claude/skills/time-ledger/scripts/log_agent_time.py \
+    --cycle-dir "<intake-base>/intake/<date>-<slug>" \
+    --phase "<this step's name, e.g. 'Evaluate'>" \
+    --role "<subagent_type used>" \
+    --label "<the task description given to Agent()>" \
+    --duration-ms <duration_ms> --tokens <subagent_tokens> --tool-uses <tool_uses>
+  ```
+  If an agent was interrupted/killed before a usage block arrived, log it
+  anyway with `--status killed` and no `--duration-ms` — an honest gap beats
+  a silently missing record (see the script's own docstring).
+- **At Step 6**, render/refresh the SDLC journey artifact (this initiative's
+  whole intake → QA → build → merge picture, not just this stage) and publish
+  it — same file path both times, so it redeploys to the same URL as the
+  initiative progresses through later stages:
+  ```
+  python3 ~/.claude/skills/time-ledger/scripts/journey_report.py \
+    --initiative-root "<intake-base>/intake/<date>-<slug>" \
+    --title "<short initiative title>" --project "<project name>" \
+    --summary "<one-line synopsis>" \
+    --stage-note intake="<PM's headline recommendation, one line>"
+  ```
+  Then call the `Artifact` tool on the resulting
+  `<intake-base>/intake/<date>-<slug>/sdlc-journey.html` (title, a one-line
+  description, and a favicon emoji fitting the project). Check for
+  `<intake-base>/intake/<date>-<slug>/artifact-url.txt` first — if it exists
+  (a later stage running in a fresh session, or a re-run), pass its contents
+  as the `Artifact` tool's `url` parameter so this redeploys to the *same*
+  artifact instead of minting a new one. After publishing, write the
+  returned URL to that same `artifact-url.txt` (create or overwrite) so
+  team-qa/team-build can find it later, from any session.
+
 ## Conventions
+- **Human gates must be visible, not just asked.** At every 🟧 HUMAN GATE
+  REQUIRED point, present the question as its own standalone callout in the
+  actual chat reply — **include the literal `🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧`
+  banner line**, not just the blockquote underneath it:
+
+  > 🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
+  >
+  > **Human decision needed:** <the question>
+
+  Never fold a gate's question into a narrative summary paragraph where it
+  reads as background rather than a stop-and-wait point. If more than one gate
+  applies in the same report-back, each gets its own banner + callout — do not
+  merge them into a single generic "want me to proceed?".
+- **When a gate offers a choice in plain chat text (not via `AskUserQuestion`),
+  letter the options** — `**A)**`, `**B)**`, `**C)**`, etc. — so Sara can
+  answer with a single letter instead of re-describing the option. A gate
+  with only one path (a plain yes/no "proceed?") doesn't need lettering —
+  this is for genuine multi-way choices.
 - **Intake base folder:** provided by the user (skill argument or message);
   if omitted, the skill asks for it. The request lives here and the
   per-request output is written under an `intake/` subfolder inside it —

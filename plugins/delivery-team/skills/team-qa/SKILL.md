@@ -64,6 +64,7 @@ comes from one of three sources — accept whichever the user gives:
 - **Explicit files/folder:** a list of changed paths or a folder of changed files.
 - **team-intake hand-off:** a completed intake folder — read its `technical-plan.md`
   "Change set" as the intended change and confirm against the actual code.
+🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
 - **If nothing was given, STOP and ask:** "What should I QA? Point me at a base git
   ref to diff, a set of changed files, or a finished intake folder — and I'll write
   the QA assessment + test plan next to it."
@@ -76,6 +77,7 @@ Use today's date. **Never write plans to a repo root.**
 ### Step 1 — Change-intake (gate)
 Run `qa-triage` on the scope source → it writes `change-brief.md` and returns a
 `READY` / `BLOCKED` verdict.
+🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
 - If **BLOCKED** (e.g. no actual change found, can't determine the diff base, a
   changed file references something that doesn't exist), surface its blocking
   questions to the user with `AskUserQuestion` (or plain text) and wait. **Do not
@@ -105,13 +107,17 @@ Run `qa-lead` with the brief, the four supporting files, and the strategist's
 verdict → it writes `test-plan.md`.
 
 ### Step 5 — Report back
-Summarize for the user in chat:
+If this run was a team-intake hand-off (scope = an existing `<intake-dir>`),
+regenerate and republish the initiative's SDLC journey artifact first (see
+"Time logging" below). Then summarize for the user in chat:
 - **Coverage verdict** (ADEQUATE / GAPPED / BLIND) and the surfaces touched.
 - **"Seen this gap class before?"** (cite this project's defect-catalog id if matched).
 - The strategist's headline recommendation (must-add-now tests vs the durable cure).
 - The test plan in 2–3 bullets (tests to add by layer).
 - Any **PENDING / PARKED decisions** still open (from `decisions.md`).
-- Links to `qa-assessment.md`, `test-plan.md`, and `decisions.md`.
+- Links to `qa-assessment.md`, `test-plan.md`, `decisions.md`, and (if
+  applicable) the journey artifact URL.
+🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
 Then ask whether to proceed to writing the tests (out of scope for this skill).
 
 ## Decision logging
@@ -128,7 +134,60 @@ just point tests?") — record it so the team keeps a readable history. Two plac
 Write the entry as `PENDING` *before* asking; flip to `DECIDED` (or `PARKED`) once
 answered.
 
+## Time logging
+Every subagent Agent() call returns a `<usage>` block (`duration_ms` /
+`subagent_tokens` / `tool_uses`) the instant it completes — persist it as you
+go, the same way team-intake does, so this stage's real compute cost isn't
+lost the moment the turn moves on:
+
+- **Right after every Agent() call's completion notification**, run:
+  ```
+  python3 ~/.claude/skills/time-ledger/scripts/log_agent_time.py \
+    --cycle-dir "<this run's output dir>" \
+    --phase "<this step's name, e.g. 'Evaluate'>" \
+    --role "<subagent_type used>" \
+    --label "<the task description given to Agent()>" \
+    --duration-ms <duration_ms> --tokens <subagent_tokens> --tool-uses <tool_uses>
+  ```
+  (`--status killed`, no `--duration-ms`, if an agent was interrupted before
+  reporting usage — an honest gap beats a silently missing record.)
+- **At Step 5, only when this run is a team-intake hand-off** (an
+  `<intake-dir>` exists — a standalone git-diff/explicit-files run has no
+  intake stage to attach a journey to), regenerate and republish the whole
+  initiative's SDLC journey artifact — same file path, so it redeploys to the
+  same URL team-intake minted:
+  ```
+  python3 ~/.claude/skills/time-ledger/scripts/journey_report.py \
+    --initiative-root "<intake-dir>" \
+    --title "<short initiative title>" --project "<project name>" \
+    --summary "<one-line synopsis>" \
+    --stage-note qa="<strategist's headline verdict + recommendation, one line>"
+  ```
+  Read `<intake-dir>/artifact-url.txt` first and pass it as the `Artifact`
+  tool's `url` parameter (this step usually runs in a fresh session that
+  never published the artifact itself, so without this it would mint a
+  second URL for the same initiative). If that file is missing, publish
+  normally and write the returned URL into it.
+
 ## Conventions
+- **Human gates must be visible, not just asked.** At every 🟧 HUMAN GATE
+  REQUIRED point, present the question as its own standalone callout in the
+  actual chat reply — **include the literal `🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧`
+  banner line**, not just the blockquote underneath it:
+
+  > 🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
+  >
+  > **Human decision needed:** <the question>
+
+  Never fold a gate's question into a narrative summary paragraph where it
+  reads as background rather than a stop-and-wait point. If more than one gate
+  applies in the same report-back, each gets its own banner + callout — do not
+  merge them into a single generic "want me to proceed?".
+- **When a gate offers a choice in plain chat text (not via `AskUserQuestion`),
+  letter the options** — `**A)**`, `**B)**`, `**C)**`, etc. — so Sara can
+  answer with a single letter instead of re-describing the option. A gate
+  with only one path (a plain yes/no "proceed?") doesn't need lettering —
+  this is for genuine multi-way choices.
 - **Scope source:** git-diff (default) / explicit-files / intake-handoff — provided
   by the user; if omitted, the skill asks.
 - **Output per run:** `<base>/qa/<date>-<slug>/` (or `<intake-dir>/qa/`) containing

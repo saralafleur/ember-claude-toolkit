@@ -78,10 +78,12 @@ team-build needs **the technical-plan** (what to build) and **the test-plan**
 - If the user gave a path to a completed intake folder, use it. The plans are
   at `<intake-dir>/intake/.../technical-plan.md` and
   `<intake-dir>/qa/.../test-plan.md` (or directly inside it). Locate both.
+🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
 - **If nothing was given, STOP and ask:** "Point me at the completed intake
   folder — the one holding the `technical-plan.md` and the `test-plan.md`.
   I'll build it in an isolated worktree and write the build report next to
   them."
+🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
 - **If only the technical-plan exists (no test-plan), STOP and ask** whether
   to run `team-qa` first. Strict red-first TDD needs the test-plan; do not
   build blind.
@@ -91,6 +93,7 @@ team-build needs **the technical-plan** (what to build) and **the test-plan**
 (reuse the intake slug; create a `supporting/` subfolder). Use today's date.
 **Never write build artifacts to a repo root.**
 
+🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
 ### Step 0.5 — Version bump check (only if the project has one)
 Check whether this project has a version-bump convention — `PROJECT-CONTEXT.md`
 names it if so. **If it does, always ask the user whether to bump before this
@@ -117,6 +120,7 @@ stack if the project has one, **confirms each worktree is clean**, records the
 **starting commit per repo**, registers the effort if this project has a
 registry configured, writes `build-brief.md`, and returns a `READY` /
 `BLOCKED` verdict.
+🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
 - If **BLOCKED** — a plan is missing/incomplete, or **a worktree is dirty** —
   surface it to the user with `AskUserQuestion` (or plain text) and wait. A
   dirty worktree is a hard gate: do not blend the build into uncommitted work.
@@ -137,6 +141,7 @@ Run `build-test-author`. It writes the tests named in `test-plan.md`, runs
 them, and **proves each one RED** against the current (unbuilt) code in this
 effort's worktree, recording the exact failing output. It changes test files
 only — **no product code**.
+🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
 - If a test that should be red passes green already, that's a signal the plan
   is wrong or the behavior already exists — **surface it and pause**; do not
   paper over it. A test that can't be made red can't prove the fix.
@@ -157,6 +162,7 @@ the project has one and the plan's scope needs it), runs the **full relevant
 suites**, confirms **each new test went red→green**, and runs the Definition
 of Done from the plans plus any standing guards this project's defect catalog
 calls for. It records the green evidence.
+🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
 - If anything is **red** or a **DoD item fails**, loop back to **Step 4**
   (implementer fixes), bounded — after ~3 fix attempts without convergence,
   stop and report to the user rather than thrashing. Never edit a test to make
@@ -172,20 +178,39 @@ to **Step 4**.
 Run `build-lead`. It writes `build-report.md`, updates the build run-log, and
 — if the build had to re-apply a known cure, took (or was tempted to take) a
 shortcut, or exposed a new repeatable build trap, and this project has a
-defect catalog configured — updates it. If you have a cross-project time/cost
-ledger skill installed and configured, `build-lead` may also refresh it and
-flag that a dashboard needs republishing (it can't publish it itself — no
+defect catalog configured — updates it. It also refreshes the cross-project
+time/cost ledger (`~/.claude/skills/time-ledger/`) on disk, if installed, and
+flags that the dashboard needs republishing (it can't do that itself — no
 Artifact tool access). Capture its headline, including that flag.
 
-### Step 7.5 — Republish a time-ledger dashboard, if you have one and it was flagged
-This step only applies if your own setup includes a time-ledger dashboard
-skill. If `build-lead` reports the ledger was refreshed, republish the
-dashboard via the Artifact tool **at its existing URL** (do not mint a new
-one) — this is the one step in team-build only the orchestrator (you) can do;
-`build-lead` updates the files, you publish them. Skip silently if
-`build-lead` flagged the refresh as failed/skipped/not-installed, or if you
-don't have this integration at all — non-blocking, don't hold up the build
-report over it.
+### Step 7.5 — Republish the time-ledger dashboard, if flagged
+If build-lead reports the ledger was refreshed, republish
+`~/CODE-LOCAL/SARA/time-tracking/dashboard.html` via the Artifact tool **at its
+existing URL** (do not mint a new one). This is the one step in team-build
+only the orchestrator (you) can do — build-lead updates the files, you publish
+them. Skip silently if build-lead flagged the refresh as failed/skipped/not
+installed — non-blocking, don't hold up the build report over it.
+
+This is the **cross-project** dashboard (hours across everything, by
+project/day/week) — separate from, and in addition to, this *initiative's own*
+SDLC journey artifact in the next step.
+
+### Step 7.6 — Regenerate and republish this initiative's SDLC journey artifact
+This build stage is one part of the same initiative team-intake (and,
+usually, team-qa) already started. Bring the journey artifact up to date with
+what this build stage did (see "Time logging" below for the mechanics):
+```
+python3 ~/.claude/skills/time-ledger/scripts/journey_report.py \
+  --initiative-root "<intake-dir>" \
+  --title "<short initiative title>" --project "<project name>" \
+  --summary "<one-line synopsis>" \
+  --stage-note build="<build-lead's verdict, one line — GREEN / GREEN-WITH-CAVEATS / BLOCKED>"
+```
+Read `<intake-dir>/artifact-url.txt` and pass it as the `Artifact` tool's
+`url` parameter so this redeploys to the same artifact team-intake (and
+team-qa) already published to, rather than minting a new one — this step
+almost always runs in a fresh session that never published it itself. If the
+marker file is missing, publish normally and write the returned URL into it.
 
 ### Step 8 — Report back (stop at green)
 Summarize for the user in chat:
@@ -197,10 +222,20 @@ Summarize for the user in chat:
   checkout) and the **one-command back-out per repo**
   (`git -C <worktree-path> reset --hard <starting-commit>`).
 - Any **PENDING / PARKED decisions** still open (from `decisions.md`).
-- Links to `build-report.md`, `build-task-list.md`, and `decisions.md`.
+- Links to `build-report.md`, `build-task-list.md`, `decisions.md`, and the
+  SDLC journey artifact.
 - Confirmation the time-ledger dashboard was republished (or why it wasn't).
+🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
 Then **stop** — do not commit, push, or open a PR. Ask whether the user wants
 to commit or hand it back for changes.
+
+> **When it's actually merged:** the journey artifact's "Merge" stage stays
+> "not started" until someone records it. Once the user merges this effort's
+> branch, write `<intake-dir>/merge.json` — `{"merged_at": "<ISO8601>",
+> "commit": "<sha>", "branch": "<branch>", "note": "<optional>"}` — then
+> re-run `journey_report.py` and republish once more (same URL) to close out
+> the journey. No skill currently automates this; do it by hand (or from a
+> future `/merge` step) when the user tells you it happened.
 
 > **After the release ships:** when this build (and any others) are committed
 > and a version is cut, run **`team-release`** to produce client-facing
@@ -223,7 +258,47 @@ keeps a readable history. Two places:
 Write the entry as `PENDING` *before* asking; flip to `DECIDED` (or `PARKED`)
 once answered.
 
+## Time logging
+Every subagent Agent() call (build-triage, build-planner, build-test-author,
+build-implementer, build-verifier, build-reviewer, build-lead — team-build's
+steps are sequential, one agent each, not a parallel fan-out like
+team-intake/team-qa) returns a `<usage>` block (`duration_ms` /
+`subagent_tokens` / `tool_uses`) the instant it completes. Persist each one:
+
+```
+python3 ~/.claude/skills/time-ledger/scripts/log_agent_time.py \
+  --cycle-dir "<intake-dir>/build/<date>-<slug>" \
+  --phase "<this step's name, e.g. 'Verify'>" \
+  --role "<subagent_type used>" \
+  --label "<the task description given to Agent()>" \
+  --duration-ms <duration_ms> --tokens <subagent_tokens> --tool-uses <tool_uses>
+```
+
+Including on a Step 5→4 or Step 6→4 loop-back — log every pass through the
+implementer/verifier, not just the final one, so the journey artifact shows
+the real cost of a fix-and-reverify cycle rather than hiding it. (`--status
+killed`, no `--duration-ms`, for an interrupted agent.) See Step 7.6 for
+rendering/publishing the artifact this feeds.
+
 ## Conventions
+- **Human gates must be visible, not just asked.** At every 🟧 HUMAN GATE
+  REQUIRED point, present the question as its own standalone callout in the
+  actual chat reply — **include the literal `🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧`
+  banner line**, not just the blockquote underneath it:
+
+  > 🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
+  >
+  > **Human decision needed:** <the question>
+
+  Never fold a gate's question into a narrative summary paragraph where it
+  reads as background rather than a stop-and-wait point. If more than one gate
+  applies in the same report-back, each gets its own banner + callout — do not
+  merge them into a single generic "want me to proceed?".
+- **When a gate offers a choice in plain chat text (not via `AskUserQuestion`),
+  letter the options** — `**A)**`, `**B)**`, `**C)**`, etc. — so Sara can
+  answer with a single letter instead of re-describing the option. A gate
+  with only one path (a plain yes/no "proceed?") doesn't need lettering —
+  this is for genuine multi-way choices.
 - **Version bump: always ask, every time, only if this project has a
   configured mechanism (Step 0.5).** Never decide unilaterally — ask the user,
   even if a bump already happened earlier in the same session.
