@@ -1,0 +1,8 @@
+{
+  "name": "delivery-team",
+  "description": "Virtual delivery teams (intake, qa, build, release, status) plus team-1shot to run intake→qa→build end-to-end.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Sara LaFleur"
+  }
+}

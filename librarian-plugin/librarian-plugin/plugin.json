@@ -1,0 +1,8 @@
+{
+  "name": "librarian",
+  "description": "A self-improving team librarian that curates durable knowledge from your work into a shared, indexed library, gated behind human approval at every write.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Sara LaFleur"
+  }
+}

@@ -1,0 +1,15 @@
+---
+description: Syntropy suite skills and agents (delivery, librarian, research)
+alwaysApply: true
+---
+
+# Syntropy Suite
+
+Plugin roots (relative to repo root):
+- `./delivery-team-plugin/delivery-team-plugin/`
+- `./librarian-plugin/librarian-plugin/`
+- `./research-team-plugin/research-team-plugin/`
+
+Global installs: `~/.claude/skills`, `~/.claude/agents`, `~/.cursor/skills`, `~/.cursor/agents`.
+
+When the user invokes delivery, librarian, or research workflows, use the matching Syntropy skill: `team-intake`, `team-qa`, `team-build`, `team-release`, `team-status`, `librarian`, `team-research`.

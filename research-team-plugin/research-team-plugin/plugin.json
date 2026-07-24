@@ -1,0 +1,8 @@
+{
+  "name": "research-team",
+  "description": "Virtual research team pipeline (scout, triage-filter, cross-examiner, synthesis-architect, red-team-reviewer, technical-editor) integrated with the librarian.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Antigravity"
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "librarian",
+  "description": "A small virtual library team that turns knowledge generated during real work sessions into a durable, well-indexed knowledge library.",
+  "version": "1.0.0",
+  "contextFileName": "GEMINI.md"
+}
