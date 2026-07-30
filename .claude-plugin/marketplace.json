@@ -51,6 +51,15 @@
       },
       "category": "productivity",
       "source": "./plugins/product-analyst"
+    },
+    {
+      "name": "engineering-manager",
+      "description": "Evaluates a folder's outstanding work (typically team-status's stage-map) and gets it moving on whatever track it actually needs. `triage` sorts outstanding items into direct-fixable housekeeping, real work that needs team-intake first, and things only a human can do — then dispatches the first two. `dispatch` decides whether build-ready items should build in parallel worktree efforts, sequentially, or as a single normal session, then dispatches and babysits the runs through to merge. Generic — works on any project using the delivery-team pipeline conventions.",
+      "author": {
+        "name": "Sara LaFleur"
+      },
+      "category": "productivity",
+      "source": "./plugins/engineering-manager"
     }
   ]
 }

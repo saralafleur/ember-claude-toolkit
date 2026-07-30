@@ -11,6 +11,7 @@ Sara LaFleur's source-of-truth marketplace for her Claude Code skills and agents
 | [`dev-workflow`](plugins/dev-workflow) | `wrap-up` (close out a unit of work — audit, human gate, commit, push, merge, clean up) and `create-skill-devops` (scaffold a project-scoped `/devops` toolbox). |
 | [`story-map`](plugins/story-map) | Scaffolds a complete UAT story map for an application — discovers roles/workflows/routes and generates a role-first test folder tree plus ready-to-run Playwright MCP UAT execution and status-reset agent prompts. |
 | [`product-analyst`](plugins/product-analyst) | Runs a virtual product team over a web solution and produces one ranked top-10 list of what to build next — `product` for feature/end-user, `tech` for technical/hardening — via triage, three specialists in parallel, a double-blind validation pass, and a lead that reconciles it all. |
+| [`engineering-manager`](plugins/engineering-manager) | Gets a folder's outstanding work (typically `team-status`'s stage-map) moving on the right track — `triage` sorts items into housekeeping / needs-intake / needs-human, `dispatch` decides whether build-ready items build in parallel, sequentially, or as a single session, then dispatches and babysits the runs through to merge. Companion to `delivery-team`. |
 
 ## Install (Claude Code)
 
@@ -34,6 +35,7 @@ Or from a local clone:
 /plugin install dev-workflow@ember-toolkit
 /plugin install story-map@ember-toolkit
 /plugin install product-analyst@ember-toolkit
+/plugin install engineering-manager@ember-toolkit
 ```
 
 **3. Reload** — run `/reload-plugins` to activate immediately, or restart your Claude Code session.
@@ -80,7 +82,7 @@ node scripts/install.mjs <tool> [plugin-name|--all] [--local]
 | Argument | Values |
 |---|---|
 | `<tool>` | `cursor`, `gemini`, or `antigravity` |
-| `plugin-name` | `delivery-team`, `librarian`, `dev-workflow`, `story-map`, `product-analyst` — omit or pass `--all` for every plugin |
+| `plugin-name` | `delivery-team`, `librarian`, `dev-workflow`, `story-map`, `product-analyst`, `engineering-manager` — omit or pass `--all` for every plugin |
 | `--local` | Install into the current project's `.cursor/`/`.agents/` instead of your user-global config. Not used by `gemini` (it manages its own install location). |
 
 Examples:
