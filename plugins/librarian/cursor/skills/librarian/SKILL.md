@@ -6,6 +6,8 @@ argument-hint: 'A mode: `capture` (default), `audit`, `wire-up [repo path]`, or 
 
 # The Librarian
 
+⚠️ **Experimental.** This skill is actively evolving — expect rough edges, and report issues if something breaks.
+
 A small **virtual library team** that turns the knowledge we generate while
 working into a durable, well-indexed **library** — so the next time we do an
 activity, the right knowledge loads and we get close to one-shot.

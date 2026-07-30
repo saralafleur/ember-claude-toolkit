@@ -6,6 +6,8 @@ argument-hint: '[<path> | auto|auto-pilot [direct] <path> | direct [auto] <path>
 
 # Team Build
 
+⚠️ **Experimental.** This skill is actively evolving — expect rough edges, and report issues if something breaks.
+
 Runs a small **virtual engineering team** over an *already-approved* plan and
 actually implements it. It is the third team in the trilogy — it closes the
 loop:

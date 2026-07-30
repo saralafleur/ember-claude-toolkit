@@ -6,6 +6,8 @@ argument-hint: '[<path> | auto|auto-pilot [direct] <path> | direct [auto] <path>
 
 # Team Intake
 
+⚠️ **Experimental.** This skill is actively evolving — expect rough edges, and report issues if something breaks.
+
 Runs a small **virtual delivery team** over an incoming request and produces
 two plans:
 

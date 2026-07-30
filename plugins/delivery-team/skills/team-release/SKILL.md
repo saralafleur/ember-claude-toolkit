@@ -6,6 +6,8 @@ argument-hint: '[<version/folders> | auto|auto-pilot <version/folders> | direct 
 
 # Team Release
 
+⚠️ **Experimental.** This skill is actively evolving — expect rough edges, and report issues if something breaks.
+
 Runs a small **virtual release team** over everything that shipped in a
 version and produces the document the **client** actually reads:
 

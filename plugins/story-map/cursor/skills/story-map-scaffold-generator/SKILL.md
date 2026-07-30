@@ -6,6 +6,8 @@ description: >
 
 # Story Map Scaffold Generator
 
+⚠️ **Experimental.** This skill is actively evolving — expect rough edges, and report issues if something breaks.
+
 ## Purpose
 
 Bootstrap a complete, populated story map for a new application by discovering its roles, workflows, routes, and scope from the project source code and documentation — then generating every required file so that the existing UAT agent and status-reset agent prompts can be run immediately on the result.

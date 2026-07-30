@@ -8,6 +8,8 @@ tools: ['codebase', 'search', 'editFiles', 'runCommands']
 
 # Wrap-up
 
+⚠️ **Experimental.** This skill is actively evolving — expect rough edges, and report issues if something breaks.
+
 Invoked via `/wrap-up`. Closes out a unit of work: **audit → human gate →
 commit → push → merge → clean up.** It exists so that finishing a piece of
 work is never a silent `git commit && push` — it's a deliberate checkpoint

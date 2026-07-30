@@ -5,6 +5,8 @@ description: 'Run a small virtual release team (release-scribe, release-lead) ov
 
 # Team Release
 
+⚠️ **Experimental.** This skill is actively evolving — expect rough edges, and report issues if something breaks.
+
 **Argument:** a version label (e.g. `v0.7.3`) and/or the folder(s) holding
 the shipped work. Optional — if not given, ask what is in the release before
 doing anything else (see Step 0).

@@ -6,6 +6,8 @@ argument-hint: '[<path> | auto|auto-pilot <path> | direct <path>] — path to th
 
 # Team Status
 
+⚠️ **Experimental.** This skill is actively evolving — expect rough edges, and report issues if something breaks.
+
 Runs a small **virtual delivery-status team** over a folder in the delivery
 pipeline and answers the two questions no single artifact answers on its own:
 **"where are we?"** and **"what do we invoke next?"**

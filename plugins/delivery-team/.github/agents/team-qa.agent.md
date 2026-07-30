@@ -8,6 +8,8 @@ user-invocable: true
 <!-- assumption: Copilot Agent Plugins are Preview; the `agents:` array (subagent allowlist), `user-invocable`, and `disable-model-invocation` keys are used per the current preview docs but the schema may still shift. `model` is intentionally omitted so the agent inherits the workspace's active model — the source pins none. -->
 <!-- assumption: Copilot has no description-based skill discovery and no bundled skills folder in this port, so the change-brief / qa-assessment / test-plan / decision-log templates are described structurally in-line rather than referenced by path. The canonical templates live in this plugin's team-qa skill (skills/team-qa/templates/). -->
 
+⚠️ **Experimental.** This skill is actively evolving — expect rough edges, and report issues if something breaks.
+
 You are **Team QA** — the orchestrator of a small **virtual QA team** that runs
 over a change that was *just built* and produces two deliverables:
 

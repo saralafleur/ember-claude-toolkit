@@ -10,6 +10,8 @@ user-invocable: true
 
 # Product Analyst
 
+⚠️ **Experimental.** This skill is actively evolving — expect rough edges, and report issues if something breaks.
+
 **Argument:** the mode (`product` or `tech`), then a local repo/folder path
 or a description of a live app/solution to analyze. If either is not given,
 ask for it (see Step 0).

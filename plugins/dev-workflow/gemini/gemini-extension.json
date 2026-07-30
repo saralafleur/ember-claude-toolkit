@@ -1,5 +1,5 @@
 {
   "name": "dev-workflow",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Two repo-level workflow skills: wrap-up (close out a unit of work \u2014 audit, human gate, commit, push, merge, clean up) and create-skill-devops (scaffold a project-scoped /devops toolbox for build-environment setup)."
 }

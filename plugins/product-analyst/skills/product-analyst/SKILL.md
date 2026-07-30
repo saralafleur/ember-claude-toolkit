@@ -19,6 +19,8 @@ description: >
 
 # Product Analyst
 
+⚠️ **Experimental.** This skill is actively evolving — expect rough edges, and report issues if something breaks.
+
 Runs a virtual **product team** over a web solution and answers "what
 should we build next, and how do we know these are good recommendations and
 not just one agent's guess?" Shape: **pipeline** — triage → parallel

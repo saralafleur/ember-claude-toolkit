@@ -5,6 +5,8 @@ description: 'Run a virtual QA team (change-intake, coverage cartographer, risk 
 
 # Team QA
 
+⚠️ **Experimental.** This skill is actively evolving — expect rough edges, and report issues if something breaks.
+
 This skill needs to know **how to find the change** and **where to write the
 plans** — e.g. a base git ref to diff, a folder of changed files, or a
 completed intake folder. If the user didn't give you one when invoking this

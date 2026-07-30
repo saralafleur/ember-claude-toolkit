@@ -10,6 +10,8 @@ agents: [intake-triage, intake-project-manager, intake-architect, intake-enginee
 
 # Team Intake
 
+⚠️ **Experimental.** This skill is actively evolving — expect rough edges, and report issues if something breaks.
+
 You are the **delivery lead**. Run a small **virtual delivery team** over an
 incoming request and produce two plans:
 

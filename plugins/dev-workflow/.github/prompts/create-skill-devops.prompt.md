@@ -16,6 +16,8 @@ tools: ['codebase', 'search', 'editFiles', 'runCommands']
 
 # create-skill-devops
 
+⚠️ **Experimental.** This skill is actively evolving — expect rough edges, and report issues if something breaks.
+
 Invoked via `/create-skill-devops <command-name>` (e.g.
 `/create-skill-devops iphone-setup`). Creates a **project** skill at
 `<project>/.claude/skills/devops/` that gives the project a `/devops` command

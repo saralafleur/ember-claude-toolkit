@@ -12,6 +12,8 @@ agents: ['release-lead', 'release-scribe']
 
 # Team Release
 
+⚠️ **Experimental.** This skill is actively evolving — expect rough edges, and report issues if something breaks.
+
 <!-- assumption: this file ports the team-release SKILL into a Copilot custom agent.
      The custom agent IS the orchestrator; it delegates to the release-scribe and
      release-lead subagents declared in `agents:` above. -->

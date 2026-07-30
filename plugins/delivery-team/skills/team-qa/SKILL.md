@@ -6,6 +6,8 @@ argument-hint: '[<scope> | auto|auto-pilot [direct] <scope> | direct [auto] <sco
 
 # Team QA
 
+⚠️ **Experimental.** This skill is actively evolving — expect rough edges, and report issues if something breaks.
+
 Runs a small **virtual QA team** over a change that was *just built* and
 produces two deliverables:
 

@@ -13,6 +13,8 @@ description: >
 
 # create-skill-devops
 
+⚠️ **Experimental.** This skill is actively evolving — expect rough edges, and report issues if something breaks.
+
 Creates a **project** skill at `<project>/.claude/skills/devops/` that gives
 the project a `/devops` command toolbox for build-environment setup. This
 meta-skill encodes the intent and discipline; the templates make it concrete.

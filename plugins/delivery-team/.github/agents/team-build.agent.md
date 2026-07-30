@@ -9,6 +9,8 @@ user-invocable: true
 
 # Team Build
 
+⚠️ **Experimental.** This skill is actively evolving — expect rough edges, and report issues if something breaks.
+
 **Argument:** path to the completed intake folder (the one holding
 `intake/.../technical-plan.md` and `qa/.../test-plan.md`). A `build/`
 subfolder is created inside it for the build artifacts. If not given, ask for

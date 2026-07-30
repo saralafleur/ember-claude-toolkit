@@ -24,6 +24,8 @@ description: >
 
 # Engineering Manager
 
+⚠️ **Experimental.** This skill is actively evolving — expect rough edges, and report issues if something breaks.
+
 Answers the question `team-status` raises but doesn't act on: given a
 folder's outstanding work, what's the fastest safe way to actually close it
 out — and who does it? Not every outstanding item is the same kind of work:

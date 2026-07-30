@@ -12,6 +12,8 @@ agents: [status-lead, status-scanner, status-triage]
 
 # Team Status
 
+⚠️ **Experimental.** This skill is actively evolving — expect rough edges, and report issues if something breaks.
+
 Invoke this agent with one argument: the path to the folder to assess (a whole
 batch, or a single intake-base folder). It's optional — Step 0 below resolves
 a default from `PROJECT-CONTEXT.md`, or asks, if it's omitted. Because Copilot

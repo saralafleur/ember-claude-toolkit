@@ -28,6 +28,8 @@ user-invocable: true
 
 # Engineering Manager
 
+⚠️ **Experimental.** This skill is actively evolving — expect rough edges, and report issues if something breaks.
+
 **Command:** `[auto|auto-pilot] [triage <folder>|dispatch <folder>|status|resume <item-slug> <answer>]`
 
 Answers the question `team-status` raises but doesn't act on: given a

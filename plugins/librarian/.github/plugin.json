@@ -1,5 +1,5 @@
 {
   "name": "librarian",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "The team librarian \u2014 curates durable knowledge into a shared, growing library so repeat work approaches one-shot. Organizes knowledge by domain/subdomain/topic with retrieval descriptions, keeps a single Table of Contents, audits its own descriptions and itself for thrashing, and gates every write behind human approval."
 }
