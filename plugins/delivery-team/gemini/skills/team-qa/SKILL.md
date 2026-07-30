@@ -29,7 +29,7 @@ runs *existing* suites to establish a baseline; authoring the new tests is a
 separate step. This is an **orchestration**: you (the main agent) run the phases
 below and delegate each role to a subagent. You are the QA lead.
 
-## The team (first-class subagents, installed globally at `~/.gemini/agents/`)
+## The team (subagents bundled with this extension)
 | Agent | Role |
 |-------|------|
 | `qa-triage` | Ingest the change (diff/files/intake-plan) → change brief; gate on ambiguity |

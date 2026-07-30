@@ -20,11 +20,42 @@ live code instead of trusting a report.
 | `team-release` | client-facing `release-notes.md` | scribe, lead (2) |
 | `team-status` | `status-report.md` + "what to run next" | triage, scanner, lead (3) |
 
+Plus one shared agent used by all five, `director-of-engineering` — invoked
+only in `direct` mode (see "Run modes" below) to pick a leaner subset of
+whichever skill called it.
+
 All five work generically on any project. If a project has its own
 `PROJECT-CONTEXT.md` (repo layout, a recurring-defect catalog, log
 locations), the teams read it and use it; if it doesn't, they fall back to
 generic behavior and their own bundled memory — nothing here requires
 project-specific setup to run.
+
+## Run modes
+
+Every skill above also accepts two optional leading tokens before its normal
+argument, composable in either order (`auto direct <path>` /
+`direct auto <path>`) — see each `SKILL.md`'s own "Run modes" section for the
+skill-specific gate-by-gate detail:
+
+- **`auto-pilot`** (alias **`auto`**) — removes the PREFERENCE gates (a
+  judgment call with a defensible best answer): the team decides for itself,
+  logs the choice to that run's `decisions.md` as `DECIDED-AUTO`, and keeps
+  going instead of stopping. QUALITY gates (the premise is actually broken —
+  a `BLOCKED` verdict, a test that's already green when it should be red, a
+  fix loop that never converged) still stop, in every mode — there's no
+  recommendation to make when something is contradictory. In `team-build`
+  and `team-release`, auto-pilot also proceeds through the final SHIP gate
+  (commit/push/finalize) rather than stopping to ask — subject to one floor
+  that holds in every mode regardless: no force-push, no `--no-verify`, no
+  push straight to a repo's default branch.
+- **`direct`** — runs a tailored, lighter-weight pass instead of the fixed
+  roster: a new shared agent, `director-of-engineering`, looks at the actual
+  request/change/plan and this skill's own roster, and decides which of that
+  skill's agents are actually warranted for this specific piece of work (it
+  never reaches outside the calling skill's own roster, and a defect-catalog
+  match always forces the full roster back on). `team-release` and
+  `team-status` already run a minimal roster, so `direct` is accepted for
+  consistency but doesn't change their behavior.
 
 ## Install
 

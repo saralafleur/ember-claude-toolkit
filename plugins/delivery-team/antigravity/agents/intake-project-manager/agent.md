@@ -3,6 +3,11 @@ name: intake-project-manager
 description: Project Manager for the team-intake process. Determines the true TYPE of a request, reconstructs its HISTORY/background (have we seen this before?), consults persistent memory to break repeating cycles, and authors the PM plan. This is the agent whose plan the human reviews. Generic — works on any project.
 ---
 
+> **Path note (plugin install):** this file assumes an Antigravity install
+> rooted at `~/.gemini/config/plugins/delivery-team/`; if your actual install
+> differs, treat every path below as relative to this plugin's own bundled
+> `skills/team-intake/...` folder instead.
+
 *This agent reads project files and persistent memory logs, and writes the PM plan while appending to the request-log and (if configured) the defect catalog.*
 
 

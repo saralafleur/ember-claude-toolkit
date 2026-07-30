@@ -5,15 +5,17 @@
 > Newest decisions at the bottom.
 >
 > Status values: **PENDING** (asked, awaiting answer) · **DECIDED** ·
-> **PARKED** (deferred to stakeholder / later) · **SUPERSEDED** (a later decision
-> overrode this one — link it).
+> **DECIDED-AUTO** (decided by the team itself under `auto-pilot`, on its own
+> best recommendation, without asking) · **PARKED** (deferred to stakeholder /
+> later) · **SUPERSEDED** (a later decision overrode this one — link it).
 
 ---
 
 ## DEC-<n> — <short title>
 - **Item / area:** <e.g. registry-complete meta-test vs point cases>
-- **Status:** PENDING | DECIDED | PARKED | SUPERSEDED
-- **Raised:** <date> · **Decided:** <date or —> · **Decided by:** <name or —>
+- **Status:** PENDING | DECIDED | DECIDED-AUTO | PARKED | SUPERSEDED
+- **Raised:** <date> · **Decided:** <date or —> · **Decided by:** <name, or
+  "auto-pilot" for a `DECIDED-AUTO` entry, or —>
 - **Recurring-issue link:** <this project's catalog id, if it has one configured, or —>
 
 ### The question

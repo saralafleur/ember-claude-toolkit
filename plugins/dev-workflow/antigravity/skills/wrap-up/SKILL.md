@@ -143,26 +143,11 @@ gate is a checkpoint, not a blocker that has to resolve to "nothing's wrong."
 - If a git worktree was used for this effort, remove it
   (`git worktree remove <path>`) and run `git worktree prune`.
 
-## Step 7 — Close the loop on tracking artifacts (if applicable)
-
-If this effort has an associated `team-intake`/`team-qa`/`team-build`
-folder with an SDLC journey artifact (`<intake-dir>/artifact-url.txt` and
-`sdlc-journey.html` exist): write `<intake-dir>/merge.json` —
-`{"merged_at": "<ISO8601>", "commit": "<merge-commit-sha>", "branch":
-"<branch>", "note": "<optional>"}` — then, if the `time-ledger` skill is
-installed, re-run its `journey_report.py` for that initiative and republish
-the artifact at its existing URL (skip this sub-step entirely if
-`time-ledger` isn't installed). This closes the "Merge" stage those
-pipelines otherwise leave permanently "not started."
-
-## Step 7.5 — Refresh project-wide status tracking (if configured)
+## Step 7 — Refresh project-wide status tracking (if configured)
 
 **This is the step that makes a fresh session's bare "next" actually cheap
 afterward — skipping it is how a wrap-up quietly leaves the project's status
-ledger stale.** Closing out the SDLC journey artifact in Step 7 is
-*intake-specific*; it says nothing to the *project-wide* status document a
-`team-status`-equipped project's "next" depends on. Those are two different
-documents. This step closes the second one.
+ledger stale.**
 
 - Check whether this project has `team-status` configured — look for a
   "Default status scope" (or "Delivery pipeline artifacts" folder) named in
@@ -187,7 +172,7 @@ documents. This step closes the second one.
 
 One tight summary: what got committed (if anything), the push, the merge
 commit sha, what got cleaned up, whether project-wide status tracking was
-refreshed (Step 7.5) or skipped and why, and confirmation everything landed
+refreshed (Step 7) or skipped and why, and confirmation everything landed
 on the remote. Then append one line to this skill's own run-log (see Memory
 below) — repo, branch, merge commit, date.
 
@@ -211,14 +196,11 @@ below) — repo, branch, merge commit, date.
 - **Log the wrap-up.** A one-line append-only record answers "when did I
   last close this out" without re-deriving it from git log across every
   project.
-- **Refresh project-wide status tracking, not just the initiative's own
-  journey artifact (Step 7.5).** Found in practice: a build merged cleanly,
-  its own SDLC journey artifact was closed out correctly, but the project's
-  batch `status-report.md` (what a fresh session's bare "next" reads) was
-  never told the effort existed — so the very next "next" paid an
-  unnecessary incremental-scan cost to discover something that had already
-  shipped. The intake-specific and project-wide documents are not the same
-  file and closing one does not close the other.
+- **Refresh project-wide status tracking (Step 7).** Found in practice: a
+  build merged cleanly, but the project's batch `status-report.md` (what a
+  fresh session's bare "next" reads) was never told the effort existed — so
+  the very next "next" paid an unnecessary incremental-scan cost to discover
+  something that had already shipped.
 
 ## Memory
 

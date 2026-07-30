@@ -1,7 +1,7 @@
 ---
 name: team-build
 description: 'Run a virtual engineering team (build-triage, build-planner, test-author, implementer, verifier, reviewer, build-lead) over an approved plan to actually BUILD it — on any project. Use when: a team-intake technical-plan and a team-qa test-plan exist and the work now needs to be implemented; you want code written test-first and proven red→green before it is declared done; you have an approved change to build and want it built without re-litigating the design; or a project has its own recurring-defect catalog and you want any durable structural cure actually applied instead of an inline shortcut. Produces a reviewable green diff in an isolated per-effort git worktree plus a build-report, and remembers when a build re-takes a shortcut so the team stops shipping the same regression — when the project has a defect catalog configured to remember it in.'
-argument-hint: 'Path to the completed intake folder (the one holding intake/.../technical-plan.md and qa/.../test-plan.md). A build/ subfolder is created inside it for the build artifacts. Optional — will ask if omitted.'
+argument-hint: '[<path> | auto|auto-pilot [direct] <path> | direct [auto] <path>] — path to the completed intake folder (the one holding intake/.../technical-plan.md and qa/.../test-plan.md). A build/ subfolder is created inside it for the build artifacts. Optional — will ask if omitted. See "Run modes" for the auto-pilot/direct tokens.'
 ---
 
 # Team Build
@@ -40,9 +40,12 @@ You are the build lead.
 > each other's uncommitted work. The first agent provisions that worktree set
 > (+ a namespaced Docker stack, if the project has one) and records the
 > starting commit(s) so the whole run stays a reviewable diff with a
-> one-command back-out per repo. It **stops at green + report**: it does NOT
-> commit, push, or open a PR, and it does NOT tear the worktree/stack down.
-> Those are the user's call.
+> one-command back-out per repo. In standard mode it **stops at green +
+> report**: it does NOT commit, push, or open a PR, and it does NOT tear the
+> worktree/stack down — those are the user's call. **Under `auto-pilot`**,
+> Step 8 commits + pushes on the effort's own isolated branch (see "Run
+> modes"); teardown stays manual in every mode regardless, since an unmerged
+> branch is still live work.
 
 ## The team (first-class agents, installed globally at `~/.claude/agents/`)
 | Agent | Role |
@@ -70,37 +73,64 @@ You are the build lead.
 > `general-purpose` agent and paste the role brief from
 > `~/.claude/agents/<name>.md`.)
 
+## Run modes
+
+Standard mode (bare `<path>`) is the default described in "Process" below:
+the fixed 7-agent sequential roster, every 🟧 gate stops and waits. Two
+optional modes change that, and compose in either order
+(`auto direct <path>` / `direct auto <path>`):
+
+| Mode | Token(s) | What changes |
+|---|---|---|
+| Auto-pilot | `auto-pilot`, alias `auto` | Every gate in "Process" is tagged **PREFERENCE**, **QUALITY**, or **SHIP**. PREFERENCE gates no longer stop — the team decides on its own best recommendation, logs the choice to `decisions.md` as `DECIDED-AUTO`, and keeps going. QUALITY gates (a `BLOCKED` verdict from a missing/incomplete plan, a red test that's already green, a fix loop that didn't converge) still stop, in every mode — there's no recommendation to make when the premise is broken. **SHIP gates proceed too under auto-pilot** (Step 8): commit + push land on this effort's own isolated branch, and open a PR if this project has that convention. What never changes, in any mode — this environment's own standing safety floor, not a skill preference: no force-push, no `--no-verify`, no push straight to the repo's default branch. |
+| Direct | `direct` | Right after Step 1's `build-triage` returns `READY`, run `director-of-engineering` with this skill's own roster (the table under "The team"). **Build's red-first TDD core is structural, not discretionary** — `build-test-author` (Step 3), `build-implementer` (Step 4), and `build-verifier` (Step 5) always run; direct mode's real discretion here is over `build-planner` (Step 2 — foldable for a single obviously-ordered task) and `build-reviewer` (Step 6 — skippable only for a small, low-risk diff, unless a defect-catalog match forces it back on). `build-triage` and `build-lead` always run regardless. |
+
+Both modes still write every artifact this skill normally writes, to the same
+paths — `direct` just produces a thinner `run-plan.md`-guided pass (fewer of
+the discretionary agents above), and `auto-pilot` still writes `decisions.md`,
+just with `DECIDED-AUTO` entries instead of a stop.
+
 ## Process
 
 ### Step 0 — Get the approved plans and the output location
 team-build needs **the technical-plan** (what to build) and **the test-plan**
 (what to prove). Both normally live inside a completed intake folder:
+
+- Parse the skill argument for a leading mode token first — `auto`/
+  `auto-pilot` and/or `direct`, in either order, before the path (see "Run
+  modes" above). Strip whatever mode tokens are present; whatever remains is
+  the path.
 - If the user gave a path to a completed intake folder, use it. The plans are
   at `<intake-dir>/intake/.../technical-plan.md` and
   `<intake-dir>/qa/.../test-plan.md` (or directly inside it). Locate both.
-🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
+
+🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧 — **required-input, unaffected by any mode.**
 - **If nothing was given, STOP and ask:** "Point me at the completed intake
   folder — the one holding the `technical-plan.md` and the `test-plan.md`.
   I'll build it in an isolated worktree and write the build report next to
-  them."
-🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
+  them." No mode removes this gate — there's nothing to recommend a location
+  for.
+
+🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧 — **PREFERENCE gate.**
 - **If only the technical-plan exists (no test-plan), STOP and ask** whether
   to run `team-qa` first. Strict red-first TDD needs the test-plan; do not
-  build blind.
+  build blind. **Under auto-pilot,** skip the ask: default to "yes, run
+  `team-qa` first" (this skill's own rule is never build blind — that's the
+  best recommendation there is), log it to `decisions.md` as `DECIDED-AUTO`.
 - Do not invent a plan or a location.
 
 **Output location:** write under `<intake-dir>/build/<YYYY-MM-DD>-<slug>/`
 (reuse the intake slug; create a `supporting/` subfolder). Use today's date.
 **Never write build artifacts to a repo root.**
 
-🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
+🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧 — **PREFERENCE gate.**
 ### Step 0.5 — Version bump check (only if the project has one)
 Check whether this project has a version-bump convention — `PROJECT-CONTEXT.md`
-names it if so. **If it does, always ask the user whether to bump before this
-build starts** — every time, regardless of whether a bump already happened
-earlier in the same session, and regardless of how obviously due a bump seems.
-This is a standing rule for any project with a configured bump mechanism, not
-a judgment call to skip.
+names it if so. In standard mode, **always ask the user whether to bump before
+this build starts** — every time, regardless of whether a bump already
+happened earlier in the same session, and regardless of how obviously due a
+bump seems. This is a standing rule for any project with a configured bump
+mechanism, not a judgment call to skip — in standard mode.
 - Ask with `AskUserQuestion` (or plain text): "Should we bump the version
   before building?" with options along the lines of *not yet* / *bump now
   (build/patch/minor/major)* / *no bump needed for this change*.
@@ -109,6 +139,11 @@ a judgment call to skip.
 - If the project has **no** version-bump convention configured, skip this step
   entirely — don't invent one.
 - If the user says not yet / no bump needed, proceed straight to Step 1.
+- **Under auto-pilot,** skip the ask: decide per the project's documented
+  convention (bump at the level the convention names for this change's scope,
+  or no bump if the convention says this class of change doesn't warrant one),
+  follow the mechanism exactly as above, and log the decision to
+  `decisions.md` as `DECIDED-AUTO` with the rationale, instead of waiting.
 
 ### Step 1 — Triage + safety gate (gate)
 Run `build-triage`. It confirms both plans are present and buildable,
@@ -120,11 +155,25 @@ stack if the project has one, **confirms each worktree is clean**, records the
 **starting commit per repo**, registers the effort if this project has a
 registry configured, writes `build-brief.md`, and returns a `READY` /
 `BLOCKED` verdict.
-🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
-- If **BLOCKED** — a plan is missing/incomplete, or **a worktree is dirty** —
-  surface it to the user with `AskUserQuestion` (or plain text) and wait. A
-  dirty worktree is a hard gate: do not blend the build into uncommitted work.
-  Offer to stash/commit first or proceed on a named clean base.
+
+**If `direct` was requested:** once triage returns `READY`, run
+`director-of-engineering` now with this skill's own roster (the table under
+"The team") — remember its discretion is limited to `build-planner` and
+`build-reviewer` (see "Run modes" above); the red-first TDD core always runs.
+It writes `run-plan.md`; follow exactly what it returns for those two agents.
+
+🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧 — **split by cause.**
+- If **BLOCKED because a plan is missing/incomplete** — **QUALITY gate, stays
+  in every mode, including auto-pilot.** Surface it to the user with
+  `AskUserQuestion` (or plain text) and wait. There's no recommendation to
+  make when the input itself isn't real.
+- If **BLOCKED because a worktree is dirty** — **PREFERENCE gate.** In
+  standard mode, surface it and wait: do not blend the build into
+  uncommitted work; offer to stash/commit first or proceed on a named clean
+  base. **Under auto-pilot,** auto-pick the skill's own already-offered safe
+  option — `git stash -u` on the dirty worktree — log it to `decisions.md` as
+  `DECIDED-AUTO`, and proceed. (Stashing is reversible and was already an
+  offered path in standard mode; this isn't a new risk auto-pilot invents.)
 - **Log every clarifying/blocking question and its answer** (see "Decision
   logging").
 
@@ -141,10 +190,13 @@ Run `build-test-author`. It writes the tests named in `test-plan.md`, runs
 them, and **proves each one RED** against the current (unbuilt) code in this
 effort's worktree, recording the exact failing output. It changes test files
 only — **no product code**.
-🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
+
+🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧 — **QUALITY gate, stays in every mode,
+including auto-pilot.**
 - If a test that should be red passes green already, that's a signal the plan
   is wrong or the behavior already exists — **surface it and pause**; do not
-  paper over it. A test that can't be made red can't prove the fix.
+  paper over it. A test that can't be made red can't prove the fix, and
+  auto-pilot has no "best recommendation" for a contradiction like this.
 
 ### Step 4 — Implement to green (sequential)
 Run `build-implementer`. It works `build-task-list.md` **in order**, applying
@@ -162,11 +214,14 @@ the project has one and the plan's scope needs it), runs the **full relevant
 suites**, confirms **each new test went red→green**, and runs the Definition
 of Done from the plans plus any standing guards this project's defect catalog
 calls for. It records the green evidence.
-🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
+
+🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧 — **QUALITY gate, stays in every mode,
+including auto-pilot.**
 - If anything is **red** or a **DoD item fails**, loop back to **Step 4**
   (implementer fixes), bounded — after ~3 fix attempts without convergence,
   stop and report to the user rather than thrashing. Never edit a test to make
-  it pass.
+  it pass. Auto-pilot gets the same bound, no silent 4th attempt — a build
+  that can't converge is a QUALITY problem, not a preference to auto-decide.
 
 ### Step 6 — Adversarial review
 Run `build-reviewer`. It reviews the **diff since the starting commit**, per
@@ -178,39 +233,7 @@ to **Step 4**.
 Run `build-lead`. It writes `build-report.md`, updates the build run-log, and
 — if the build had to re-apply a known cure, took (or was tempted to take) a
 shortcut, or exposed a new repeatable build trap, and this project has a
-defect catalog configured — updates it. It also refreshes the cross-project
-time/cost ledger (`~/.claude/skills/time-ledger/`) on disk, if installed, and
-flags that the dashboard needs republishing (it can't do that itself — no
-Artifact tool access). Capture its headline, including that flag.
-
-### Step 7.5 — Republish the time-ledger dashboard, if flagged
-If build-lead reports the ledger was refreshed, republish
-`~/CODE-LOCAL/SARA/time-tracking/dashboard.html` via the Artifact tool **at its
-existing URL** (do not mint a new one). This is the one step in team-build
-only the orchestrator (you) can do — build-lead updates the files, you publish
-them. Skip silently if build-lead flagged the refresh as failed/skipped/not
-installed — non-blocking, don't hold up the build report over it.
-
-This is the **cross-project** dashboard (hours across everything, by
-project/day/week) — separate from, and in addition to, this *initiative's own*
-SDLC journey artifact in the next step.
-
-### Step 7.6 — Regenerate and republish this initiative's SDLC journey artifact
-This build stage is one part of the same initiative team-intake (and,
-usually, team-qa) already started. Bring the journey artifact up to date with
-what this build stage did (see "Time logging" below for the mechanics):
-```
-python3 ~/.claude/skills/time-ledger/scripts/journey_report.py \
-  --initiative-root "<intake-dir>" \
-  --title "<short initiative title>" --project "<project name>" \
-  --summary "<one-line synopsis>" \
-  --stage-note build="<build-lead's verdict, one line — GREEN / GREEN-WITH-CAVEATS / BLOCKED>"
-```
-Read `<intake-dir>/artifact-url.txt` and pass it as the `Artifact` tool's
-`url` parameter so this redeploys to the same artifact team-intake (and
-team-qa) already published to, rather than minting a new one — this step
-almost always runs in a fresh session that never published it itself. If the
-marker file is missing, publish normally and write the returned URL into it.
+defect catalog configured — updates it. Capture its headline.
 
 ### Step 8 — Report back (stop at green)
 Summarize for the user in chat:
@@ -222,20 +245,21 @@ Summarize for the user in chat:
   checkout) and the **one-command back-out per repo**
   (`git -C <worktree-path> reset --hard <starting-commit>`).
 - Any **PENDING / PARKED decisions** still open (from `decisions.md`).
-- Links to `build-report.md`, `build-task-list.md`, `decisions.md`, and the
-  SDLC journey artifact.
-- Confirmation the time-ledger dashboard was republished (or why it wasn't).
-🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
-Then **stop** — do not commit, push, or open a PR. Ask whether the user wants
-to commit or hand it back for changes.
+- Links to `build-report.md`, `build-task-list.md`, and `decisions.md`.
+- **Under auto-pilot:** also list every `DECIDED-AUTO` entry from this run —
+  "Decided automatically (auto-pilot): N items — see decisions.md."
 
-> **When it's actually merged:** the journey artifact's "Merge" stage stays
-> "not started" until someone records it. Once the user merges this effort's
-> branch, write `<intake-dir>/merge.json` — `{"merged_at": "<ISO8601>",
-> "commit": "<sha>", "branch": "<branch>", "note": "<optional>"}` — then
-> re-run `journey_report.py` and republish once more (same URL) to close out
-> the journey. No skill currently automates this; do it by hand (or from a
-> future `/merge` step) when the user tells you it happened.
+🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧 — **SHIP gate.** In standard mode, **stop**
+— do not commit, push, or open a PR. Ask whether the user wants to commit or
+hand it back for changes. **Under auto-pilot,** proceed: commit on this
+effort's own isolated branch (the one `build-triage` provisioned, never a
+shared checkout), push it, and open a PR if this project has that convention
+— then report what was pushed instead of asking. This is the one line that
+does not bend to any mode, auto-pilot included, because it's this
+environment's own standing safety floor rather than a per-skill preference:
+**never force-push, never `--no-verify`, never push straight to the repo's
+default branch.** Auto-pilot commits land on the effort's own branch, full
+stop.
 
 > **After the release ships:** when this build (and any others) are committed
 > and a version is cut, run **`team-release`** to produce client-facing
@@ -258,28 +282,6 @@ keeps a readable history. Two places:
 Write the entry as `PENDING` *before* asking; flip to `DECIDED` (or `PARKED`)
 once answered.
 
-## Time logging
-Every subagent Agent() call (build-triage, build-planner, build-test-author,
-build-implementer, build-verifier, build-reviewer, build-lead — team-build's
-steps are sequential, one agent each, not a parallel fan-out like
-team-intake/team-qa) returns a `<usage>` block (`duration_ms` /
-`subagent_tokens` / `tool_uses`) the instant it completes. Persist each one:
-
-```
-python3 ~/.claude/skills/time-ledger/scripts/log_agent_time.py \
-  --cycle-dir "<intake-dir>/build/<date>-<slug>" \
-  --phase "<this step's name, e.g. 'Verify'>" \
-  --role "<subagent_type used>" \
-  --label "<the task description given to Agent()>" \
-  --duration-ms <duration_ms> --tokens <subagent_tokens> --tool-uses <tool_uses>
-```
-
-Including on a Step 5→4 or Step 6→4 loop-back — log every pass through the
-implementer/verifier, not just the final one, so the journey artifact shows
-the real cost of a fix-and-reverify cycle rather than hiding it. (`--status
-killed`, no `--duration-ms`, for an interrupted agent.) See Step 7.6 for
-rendering/publishing the artifact this feeds.
-
 ## Conventions
 - **Human gates must be visible, not just asked.** At every 🟧 HUMAN GATE
   REQUIRED point, present the question as its own standalone callout in the
@@ -295,13 +297,15 @@ rendering/publishing the artifact this feeds.
   applies in the same report-back, each gets its own banner + callout — do not
   merge them into a single generic "want me to proceed?".
 - **When a gate offers a choice in plain chat text (not via `AskUserQuestion`),
-  letter the options** — `**A)**`, `**B)**`, `**C)**`, etc. — so Sara can
+  letter the options** — `**A)**`, `**B)**`, `**C)**`, etc. — so the user can
   answer with a single letter instead of re-describing the option. A gate
   with only one path (a plain yes/no "proceed?") doesn't need lettering —
   this is for genuine multi-way choices.
 - **Version bump: always ask, every time, only if this project has a
   configured mechanism (Step 0.5).** Never decide unilaterally — ask the user,
-  even if a bump already happened earlier in the same session.
+  even if a bump already happened earlier in the same session. **Under
+  auto-pilot**, this becomes a `DECIDED-AUTO` per the project's own
+  convention instead of a stop — see "Run modes".
 - **Inputs:** a completed intake folder holding `technical-plan.md` +
   `test-plan.md`; if omitted, the skill asks. Do not build without both.
 - **Output per build:** `<intake-dir>/build/<date>-<slug>/` containing
@@ -318,8 +322,9 @@ rendering/publishing the artifact this feeds.
 - **This skill mutates a tree in place, sequentially, one implementer, no
   parallel edits to the same files within a build.** It gates on a clean tree
   per repo, records the starting commit(s), builds **strict red-first**, and
-  **stops at green + report** — no commit/push/PR, and no automatic teardown
-  of the worktree/stack either.
+  in standard mode **stops at green + report** — no commit/push/PR (under
+  `auto-pilot`, it does commit/push, per "Run modes" — never teardown though,
+  in any mode, since that's always the user's call).
 - **Every build runs in its own isolated git worktree set** (+ a namespaced
   Docker stack, if the project has one), provisioned by `build-triage`.
   Teardown is manual, run by whoever merges — never automatic, since an

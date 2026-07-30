@@ -1,7 +1,7 @@
 ---
 name: team-status
 description: 'Run a virtual delivery-status team over a folder in a project''s delivery pipeline and answer "where are we, and what do we invoke next?" — on any project. Use when: you open a batch or an intake-base folder and need to know the true current state of every work item in it; a plan/report might be stale and you want it re-verified against the live code, not just re-read; you are picking up work someone else (or a past session) produced and need to reconstruct it; or you want a single, current status-report.md that says which of team-intake / team-qa / team-build / librarian to run next and why. Also trigger on short, bare prompts asking to reconstruct current state and the next step — e.g. "next", "next?", "what''s next", "where are we", "where are we at", "status check", "status" — even with no folder named (Step 0 resolves the folder from PROJECT-CONTEXT.md or asks). Produces one status-report.md per run and a thin run-log, and it NEVER changes product code, plans, or tests — it is read-only and advisory.'
-argument-hint: 'Path to the folder to assess (a whole batch, or a single intake-base folder). Optional — will ask if omitted.'
+argument-hint: '[<path> | auto|auto-pilot <path> | direct <path>] — path to the folder to assess (a whole batch, or a single intake-base folder). Optional — will ask if omitted. See "Run modes" for the auto-pilot/direct tokens.'
 ---
 
 # Team Status
@@ -59,6 +59,17 @@ code, a plan, a test, or another team's memory.
 > available as a subagent type, fall back to a `general-purpose` agent and
 > paste the role brief from `~/.claude/agents/<name>.md`.)
 
+## Run modes
+
+Standard mode (bare `<path>`) is the default described in "Process" below:
+the fixed 3-agent roster, every 🟧 gate stops and waits. Two optional modes
+change that, and compose in either order:
+
+| Mode | Token(s) | What changes |
+|---|---|---|
+| Auto-pilot | `auto-pilot`, alias `auto` | Every gate in "Process" is tagged **PREFERENCE**, **QUALITY**, or **required-input**. PREFERENCE gates no longer stop — the team decides on its own best recommendation (usually the option this skill already states as "recommended"), logs the choice to `status-decisions.md` as `DECIDED-AUTO`, and keeps going. The QUALITY gate (Step 1's `BLOCKED` — target doesn't exist or has nothing to assess) still stops, in every mode. This skill stays strictly read-only and advisory in every mode — "proceeds" at Step 4 means it states the recommendation as decided rather than asking, it never starts invoking `team-intake`/`team-qa`/`team-build` itself; that boundary doesn't move. |
+| Direct | `direct` | Accepted for consistency with the rest of the suite, but has little to trim here: the roster is already 3 agents (triage, per-item scanner, lead) and Steps 0.5/1.5 already do a more sophisticated version of what `director-of-engineering` would decide elsewhere — which items actually need a live re-check, fingerprinted down to the field. `director-of-engineering` is not invoked; `direct` behaves the same as standard mode for agent selection. |
+
 ## Process
 
 ### Step 0 — Resolve the scope
@@ -68,6 +79,11 @@ code, a plan, a test, or another team's memory.
 - **Single item** — one intake-base folder holding one item's
   `intake/`/`qa/`/`build/` trail. Assess just it.
 
+Parse the skill argument for a leading mode token first — `auto`/
+`auto-pilot` and/or `direct`, before the path (see "Run modes" above). Strip
+whatever mode tokens are present; whatever remains is the path (which may
+still be empty — this skill is one of the ones that can run with none given).
+
 If the user gave a path, use it. **If no path was given, check for a default
 before asking:** look for a `PROJECT-CONTEXT.md` at the project root. If it
 names a "Default status scope" (or, failing that, a "Delivery pipeline
@@ -75,12 +91,13 @@ artifacts" folder), use that as the target — state the interpretation you're
 taking ("no folder given — defaulting to `<path>` per `PROJECT-CONTEXT.md`")
 and proceed without stopping.
 
-🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
+🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧 — **required-input, unaffected by any mode.**
 **Only if no path was given AND no PROJECT-CONTEXT.md default exists, STOP
 and ask:** "Which folder should I assess — a whole batch, or a single
 intake-base folder? I'll reconstruct the true current state and write a
 `status-report.md` there." If the shape is genuinely ambiguous, state the
-interpretation you're taking and proceed; don't stall on it.
+interpretation you're taking and proceed; don't stall on it. No mode removes
+this gate — there's nothing to recommend a target for.
 
 **Output location:** write `status-report.md` at the **root of the target
 folder** (so a batch gets one roll-up report, a single item gets its own).
@@ -138,10 +155,13 @@ for each records the **artifact inventory** — which of these exist:
 `qa/test-plan.md`, `qa/qa-assessment.md`, `build/**/build-report.md`,
 `decisions.md`. This is pure inventory — no judgment yet. It writes nothing
 but returns the item list + a `READY` / `BLOCKED` verdict.
-🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
+
+🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧 — **QUALITY gate, stays in every mode,
+including auto-pilot.**
 - **BLOCKED** only if the target doesn't exist, is empty, or contains nothing
   that looks like pipeline work. Surface that to the user (plain text or
-  `AskUserQuestion`) and stop — don't fan out scanners over nothing.
+  `AskUserQuestion`) and stop — don't fan out scanners over nothing. There's
+  nothing to recommend when the target itself is empty or unreadable.
 - **Log every clarifying/blocking question and its answer** (see "Decision
   logging").
 
@@ -207,14 +227,15 @@ silent default.
      `**Verdict:**` line) — don't guess. Leave the item **RESCAN-CANDIDATE**.
      This check only ever *removes* scanner work when it's confident; it never
      invents confidence to save a call.
-🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
+
+🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧 — **PREFERENCE gate.**
 6. **Ask before scanning.** Tell the user the split, and call out any items
    step 5 downgraded so that's visible, not silent: e.g. *"12 items unchanged
    since the last run (cache trusted), 2 items touched but confirmed
-   cosmetic by fingerprint re-check (cache trusted): `uat-061826-topr-changes`
-   (added a doc pointer, no claim changed), `committee-about-restructure`
+   cosmetic by fingerprint re-check (cache trusted): `<item-slug-a>`
+   (added a doc pointer, no claim changed), `<item-slug-b>`
    (build-report touched but verdict/decisions/test-numbers unchanged) — 1
-   item shows a real change: `getmodsbyoffice-idor-scoping-gap` (verdict text
+   item shows a real change: `<item-slug-c>` (verdict text
    in build-report.md changed)."* Then use `AskUserQuestion` with three
    options:
    - **Rescan only the flagged items (recommended)** — launch scanners for
@@ -225,6 +246,11 @@ silent default.
      flagged as unverified-since-`LAST_RUN` in the output.
    - **Force full rescan of all items** — ignore SKIP/RESCAN-CANDIDATE
      entirely, scanner on every item regardless of what changed.
+
+   **Under auto-pilot,** skip this ask too: auto-pick "rescan only the
+   flagged items" (this skill's own stated recommendation), log it to
+   `status-decisions.md` as `DECIDED-AUTO`, and state the split in the
+   summary instead of waiting.
 
    **Skip this ask** (go straight to "rescan the flagged items") when: the
    user's invocation already said `--force` / "force rescan" / "re-verify
@@ -306,8 +332,8 @@ parallelization choice verbatim.
 
 ### Step 4 — Report back
 Present the reconciled state **in chat as plain-text tables** (ASCII-style
-markdown tables render fine and are what Sara has asked for — not a rendered
-UI/artifact page unless she explicitly asks for one):
+markdown tables render fine in chat — prefer them over a rendered
+UI/artifact page unless the user explicitly asks for one):
 - **A numbered stage-map table** — columns `#` · `Item` · `Intake` · `QA` ·
   `Build` · `Merged` · `Notes`, using ✅ / ❌ / ➡️ per the template's legend.
   This is the primary "where are we" answer — lead with it. Number the rows
@@ -330,13 +356,20 @@ UI/artifact page unless she explicitly asks for one):
 - **The single next action** — the skill to run next, the target folder, and
   the one-line why.
 - Links to `status-report.md` and any per-item scratch worth reading.
-🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
+- **Under auto-pilot:** also list every `DECIDED-AUTO` entry from this run —
+  "Decided automatically (auto-pilot): N items — see status-decisions.md."
+
+🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧 — **PREFERENCE gate.**
 Then ask whether to proceed with the recommended next action (which means
 invoking one of the *other* skills — out of scope for this one), or invite
 the user to pick a row number from either table directly. Letter the
 choice — e.g. **A)** proceed with the recommended next action, **B)** pick a
 different row/item, **C)** something else — per the lettering convention
-above.
+above. **Under auto-pilot,** skip the ask: state the recommended next action
+as decided rather than a question, log it as `DECIDED-AUTO`. This does not
+change what the skill *does* — it's still read-only/advisory in every mode
+and does not itself invoke `team-intake`/`team-qa`/`team-build`; "proceeds"
+here means it stops phrasing the recommendation as a question.
 
 **Fully cached variant (Step 0.5 found nothing changed, no agents ran):**
 Skip the bullets above — there is no fresh reconciliation to summarize.
@@ -347,7 +380,7 @@ this run); and mention that a full rescan can be requested (`--force` /
 "force rescan") if they want it re-verified anyway despite no detected
 changes.
 
-🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
+🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧 — **PREFERENCE gate.**
 **If `status-lead` found a parallelization opportunity** (two or more
 independent build-ready items), do not fold that into the same yes/no —
 put it to the user as its own explicit choice via `AskUserQuestion` with
@@ -384,7 +417,10 @@ three options:
   State the lower-review-load trade-off.
 
 Let the user pick; there is no unilateral default beyond presenting A first.
-Whichever is chosen, proceed accordingly.
+Whichever is chosen, proceed accordingly. **Under auto-pilot,** skip the ask:
+auto-pick **Option A** (already this skill's own presented-first default —
+fresh, self-contained kickoff lines, no subagent spawned), log it as
+`DECIDED-AUTO`, and print the kickoff lines directly instead of waiting.
 
 ## Decision logging
 This is a read-only audit skill, so it rarely needs a decision from the
@@ -414,7 +450,7 @@ Write it `PENDING` before asking; flip to `DECIDED` / `PARKED` once answered.
   applies in the same report-back, each gets its own banner + callout — do not
   merge them into a single generic "want me to proceed?".
 - **When a gate offers a choice in plain chat text (not via `AskUserQuestion`),
-  letter the options** — `**A)**`, `**B)**`, `**C)**`, etc. — so Sara can
+  letter the options** — `**A)**`, `**B)**`, `**C)**`, etc. — so the user can
   answer with a single letter instead of re-describing the option. This
   applies to every human gate in this skill that presents more than one
   path forward: Step 0's ambiguous-scope ask, Step 1.5's rescan-scope ask

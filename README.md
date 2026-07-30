@@ -8,9 +8,9 @@ Sara LaFleur's source-of-truth marketplace for her Claude Code skills and agents
 |---|---|
 | [`delivery-team`](plugins/delivery-team) | Five virtual delivery teams (intake, qa, build, release, status) that run a request through plan → test → build → release, plus a read-only status reconciler. |
 | [`librarian`](plugins/librarian) | Curates durable knowledge into a shared, growing library — organized by domain/subdomain/topic, with retrieval descriptions and human-gated writes. |
-| [`time-ledger`](plugins/time-ledger) | Cross-project time, token, and cost ledger built from Claude Code session transcripts — daily/weekly/monthly rollups and per-initiative journey artifacts. |
 | [`dev-workflow`](plugins/dev-workflow) | `wrap-up` (close out a unit of work — audit, human gate, commit, push, merge, clean up) and `create-skill-devops` (scaffold a project-scoped `/devops` toolbox). |
 | [`story-map`](plugins/story-map) | Scaffolds a complete UAT story map for an application — discovers roles/workflows/routes and generates a role-first test folder tree plus ready-to-run Playwright MCP UAT execution and status-reset agent prompts. |
+| [`product-analyst`](plugins/product-analyst) | Runs a virtual product team over a web solution and produces one ranked top-10 list of what to build next — `product` for feature/end-user, `tech` for technical/hardening — via triage, three specialists in parallel, a double-blind validation pass, and a lead that reconciles it all. |
 
 ## Install (Claude Code)
 
@@ -31,9 +31,9 @@ Or from a local clone:
 ```
 /plugin install delivery-team@ember-toolkit
 /plugin install librarian@ember-toolkit
-/plugin install time-ledger@ember-toolkit
 /plugin install dev-workflow@ember-toolkit
 /plugin install story-map@ember-toolkit
+/plugin install product-analyst@ember-toolkit
 ```
 
 **3. Reload** — run `/reload-plugins` to activate immediately, or restart your Claude Code session.
@@ -56,7 +56,7 @@ This repo ports every plugin above into four other AI coding tools. Two have a r
 
 ### VS Code / GitHub Copilot (Agent Plugins, Preview)
 
-Same shape as Claude Code's marketplace — a `.github/plugin/marketplace.json` at this repo's root lists all 5 plugins.
+Same shape as Claude Code's marketplace — a `.github/plugin/marketplace.json` at this repo's root lists all 4 plugins.
 
 1. Register the marketplace — either add this to your VS Code `settings.json`:
    ```json
@@ -80,7 +80,7 @@ node scripts/install.mjs <tool> [plugin-name|--all] [--local]
 | Argument | Values |
 |---|---|
 | `<tool>` | `cursor`, `gemini`, or `antigravity` |
-| `plugin-name` | `delivery-team`, `librarian`, `time-ledger`, `dev-workflow`, `story-map` — omit or pass `--all` for every plugin |
+| `plugin-name` | `delivery-team`, `librarian`, `dev-workflow`, `story-map`, `product-analyst` — omit or pass `--all` for every plugin |
 | `--local` | Install into the current project's `.cursor/`/`.agents/` instead of your user-global config. Not used by `gemini` (it manages its own install location). |
 
 Examples:

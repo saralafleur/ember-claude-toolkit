@@ -1,7 +1,7 @@
 ---
 name: team-qa
 description: 'Run a virtual QA team (change-intake, coverage cartographer, risk analyst, unit-test architect, e2e-test architect, QA strategist, QA lead) over a change that was just built — on any project. Use when: code has just been written/modified and you need to know what tests to add or update so it cannot silently regress; you want to understand the current testing strategy for an area before changing it; you have a git diff, a set of changed files, or a completed team-intake technical-plan and need a test plan; or you want to know "is what we just built actually guarded, or will it ship green-but-broken?". Produces a QA assessment (the coverage verdict) and a buildable test plan, and remembers recurring coverage gaps (when the project has a defect catalog configured) so the team stops shipping the same blind spot.'
-argument-hint: 'How to find the change + where to write. e.g. a base git ref to diff, a folder of changed files, or a completed intake folder. Optional — will ask if omitted.'
+argument-hint: '[<scope> | auto|auto-pilot [direct] <scope> | direct [auto] <scope>] — how to find the change + where to write, e.g. a base git ref to diff, a folder of changed files, or a completed intake folder. Optional — will ask if omitted. See "Run modes" for the auto-pilot/direct tokens.'
 ---
 
 # Team QA
@@ -50,11 +50,34 @@ below and delegate each role to a subagent. You are the QA lead.
 > back to a `general-purpose` agent and paste the role brief from
 > `~/.claude/agents/<name>.md`.)
 
+## Run modes
+
+Standard mode (bare `<scope>`) is the default described in "Process" below:
+the fixed 7-agent roster, every 🟧 gate stops and waits. Two optional modes
+change that, and compose in either order (`auto direct <scope>` /
+`direct auto <scope>`):
+
+| Mode | Token(s) | What changes |
+|---|---|---|
+| Auto-pilot | `auto-pilot`, alias `auto` | Every gate in "Process" is tagged **PREFERENCE**, **QUALITY**, or **required-input**. PREFERENCE gates no longer stop — the team decides on its own best recommendation, logs the choice to `decisions.md` as `DECIDED-AUTO`, and keeps going. QUALITY gates (an actually-`BLOCKED` verdict) still stop, in every mode — there's no recommendation to make when the change itself isn't pinned down. |
+| Direct | `direct` | Right after Step 1's `qa-triage` returns `READY`, run `director-of-engineering` with this skill's own roster (the table under "The team") instead of the fixed Step 2 fan-out; execute exactly the agents/order it returns in place of Steps 2–4. |
+
+Both modes still write every artifact this skill normally writes, to the same
+paths — `direct` just produces fewer `supporting/*.md` files (only for the
+agents actually run), and `auto-pilot` still writes `decisions.md`, just with
+`DECIDED-AUTO` entries instead of a stop.
+
 ## Process
 
 ### Step 0 — Get the change scope and the output location
-team-qa needs to know **what just changed** and **where to write the plans**. Scope
-comes from one of three sources — accept whichever the user gives:
+team-qa needs to know **what just changed** and **where to write the plans**.
+
+- Parse the skill argument for a leading mode token first — `auto`/
+  `auto-pilot` and/or `direct`, in either order, before the scope (see "Run
+  modes" above). Strip whatever mode tokens are present; whatever remains is
+  the scope.
+
+Scope comes from one of three sources — accept whichever the user gives:
 - **Git diff (default):** a base ref (branch/commit) to diff against. If the
   project has multiple independent repos (check `PROJECT-CONTEXT.md`), the
   diff runs against whichever repo(s) the change touches — the git repo may
@@ -64,10 +87,12 @@ comes from one of three sources — accept whichever the user gives:
 - **Explicit files/folder:** a list of changed paths or a folder of changed files.
 - **team-intake hand-off:** a completed intake folder — read its `technical-plan.md`
   "Change set" as the intended change and confirm against the actual code.
-🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
+
+🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧 — **required-input, unaffected by any mode.**
 - **If nothing was given, STOP and ask:** "What should I QA? Point me at a base git
   ref to diff, a set of changed files, or a finished intake folder — and I'll write
-  the QA assessment + test plan next to it."
+  the QA assessment + test plan next to it." No mode removes this gate — there's
+  nothing to recommend a scope for.
 
 **Output location:** if pointed at an existing team-intake folder, write under
 `<that-intake-dir>/qa/`. Otherwise create `<base>/qa/<YYYY-MM-DD>-<slug>/` (derive a
@@ -77,11 +102,20 @@ Use today's date. **Never write plans to a repo root.**
 ### Step 1 — Change-intake (gate)
 Run `qa-triage` on the scope source → it writes `change-brief.md` and returns a
 `READY` / `BLOCKED` verdict.
-🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
+
+**If `direct` was requested:** once triage returns `READY`, run
+`director-of-engineering` now with this skill's own roster (the table under
+"The team") instead of the fixed Step 2 fan-out below — it writes
+`run-plan.md`; execute exactly the agents/order it returns in place of
+Steps 2–4.
+
+🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧 — **QUALITY gate, stays in every mode,
+including auto-pilot.**
 - If **BLOCKED** (e.g. no actual change found, can't determine the diff base, a
   changed file references something that doesn't exist), surface its blocking
   questions to the user with `AskUserQuestion` (or plain text) and wait. **Do not
-  plan tests for a change nobody has pinned down.**
+  plan tests for a change nobody has pinned down.** Auto-pilot has no "best
+  recommendation" for a change that isn't real — it stops here too.
 - **Log every clarifying/blocking question and its answer** (see "Decision logging")
   — record it `PENDING` before asking, flip to `DECIDED` when answered. Then update
   the brief and proceed.
@@ -107,18 +141,21 @@ Run `qa-lead` with the brief, the four supporting files, and the strategist's
 verdict → it writes `test-plan.md`.
 
 ### Step 5 — Report back
-If this run was a team-intake hand-off (scope = an existing `<intake-dir>`),
-regenerate and republish the initiative's SDLC journey artifact first (see
-"Time logging" below). Then summarize for the user in chat:
+Summarize for the user in chat:
 - **Coverage verdict** (ADEQUATE / GAPPED / BLIND) and the surfaces touched.
 - **"Seen this gap class before?"** (cite this project's defect-catalog id if matched).
 - The strategist's headline recommendation (must-add-now tests vs the durable cure).
 - The test plan in 2–3 bullets (tests to add by layer).
 - Any **PENDING / PARKED decisions** still open (from `decisions.md`).
-- Links to `qa-assessment.md`, `test-plan.md`, `decisions.md`, and (if
-  applicable) the journey artifact URL.
-🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
+- **Under auto-pilot:** also list every `DECIDED-AUTO` entry from this run —
+  "Decided automatically (auto-pilot): N items — see decisions.md."
+- Links to `qa-assessment.md`, `test-plan.md`, and `decisions.md`.
+
+🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧 — **PREFERENCE gate.**
 Then ask whether to proceed to writing the tests (out of scope for this skill).
+**Under auto-pilot,** skip the ask: default to "yes, proceed to `team-build`
+next," log it to `decisions.md` as `DECIDED-AUTO`, and say so plainly in the
+summary above instead of waiting.
 
 ## Decision logging
 Whenever a clarifying or blocking question goes to the user — at the Step 1 gate or
@@ -133,41 +170,6 @@ just point tests?") — record it so the team keeps a readable history. Two plac
 
 Write the entry as `PENDING` *before* asking; flip to `DECIDED` (or `PARKED`) once
 answered.
-
-## Time logging
-Every subagent Agent() call returns a `<usage>` block (`duration_ms` /
-`subagent_tokens` / `tool_uses`) the instant it completes — persist it as you
-go, the same way team-intake does, so this stage's real compute cost isn't
-lost the moment the turn moves on:
-
-- **Right after every Agent() call's completion notification**, run:
-  ```
-  python3 ~/.claude/skills/time-ledger/scripts/log_agent_time.py \
-    --cycle-dir "<this run's output dir>" \
-    --phase "<this step's name, e.g. 'Evaluate'>" \
-    --role "<subagent_type used>" \
-    --label "<the task description given to Agent()>" \
-    --duration-ms <duration_ms> --tokens <subagent_tokens> --tool-uses <tool_uses>
-  ```
-  (`--status killed`, no `--duration-ms`, if an agent was interrupted before
-  reporting usage — an honest gap beats a silently missing record.)
-- **At Step 5, only when this run is a team-intake hand-off** (an
-  `<intake-dir>` exists — a standalone git-diff/explicit-files run has no
-  intake stage to attach a journey to), regenerate and republish the whole
-  initiative's SDLC journey artifact — same file path, so it redeploys to the
-  same URL team-intake minted:
-  ```
-  python3 ~/.claude/skills/time-ledger/scripts/journey_report.py \
-    --initiative-root "<intake-dir>" \
-    --title "<short initiative title>" --project "<project name>" \
-    --summary "<one-line synopsis>" \
-    --stage-note qa="<strategist's headline verdict + recommendation, one line>"
-  ```
-  Read `<intake-dir>/artifact-url.txt` first and pass it as the `Artifact`
-  tool's `url` parameter (this step usually runs in a fresh session that
-  never published the artifact itself, so without this it would mint a
-  second URL for the same initiative). If that file is missing, publish
-  normally and write the returned URL into it.
 
 ## Conventions
 - **Human gates must be visible, not just asked.** At every 🟧 HUMAN GATE
@@ -184,7 +186,7 @@ lost the moment the turn moves on:
   applies in the same report-back, each gets its own banner + callout — do not
   merge them into a single generic "want me to proceed?".
 - **When a gate offers a choice in plain chat text (not via `AskUserQuestion`),
-  letter the options** — `**A)**`, `**B)**`, `**C)**`, etc. — so Sara can
+  letter the options** — `**A)**`, `**B)**`, `**C)**`, etc. — so the user can
   answer with a single letter instead of re-describing the option. A gate
   with only one path (a plain yes/no "proceed?") doesn't need lettering —
   this is for genuine multi-way choices.

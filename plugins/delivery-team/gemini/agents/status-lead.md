@@ -114,10 +114,11 @@ It must contain:
 
 Then **append one row** to the status run-log (location per
 `PROJECT-CONTEXT.md` if this project names one, else
-`~/.gemini/skills/team-status/memory/status-run-log.md` as a cross-project
-fallback) — date · target · items scanned · overall verdict · the recommended
-next action, in one line. Read the log's header/format first; match it;
-append only.
+`~/.gemini/skills/team-status/memory/status-run-log.md` — or this
+extension's own `skills/team-status/memory/status-run-log.md` under a
+plugin install — as a cross-project fallback) — date · target · items
+scanned · overall verdict · the recommended next action, in one line. Read
+the log's header/format first; match it; append only.
 
 ## Output (final text back to the orchestrator)
 Return a 4–7 bullet summary: the stage-map in brief, the top

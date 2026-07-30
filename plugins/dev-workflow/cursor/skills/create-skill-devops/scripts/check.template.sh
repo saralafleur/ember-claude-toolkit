@@ -19,7 +19,7 @@ line() { printf '%-18s | %-8s | %s\n' "$1" "$2" "$3"; }
 # --- OS / hardware context ---
 line "os" "info" "$(sw_vers -productVersion 2>/dev/null || uname -sr) ($(uname -m))"
 
-avail_gb=$(df -g / | awk 'NR==2 {print $4}')
+avail_gb=$(df -Pk / | awk 'NR==2 {printf "%d", $4/1048576}')  # -Pk (POSIX, 1024-byte blocks) is portable across BSD/macOS and GNU df; -g is BSD-only
 if [ "$avail_gb" -ge {{MIN_DISK_GB}} ]; then disk_status="ok"; else disk_status="LOW"; fi
 line "disk-free" "$disk_status" "${avail_gb} GB free (install needs ~{{MIN_DISK_GB}} GB free)"
 

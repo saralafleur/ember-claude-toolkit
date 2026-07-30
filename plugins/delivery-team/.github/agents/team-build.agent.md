@@ -171,21 +171,7 @@ real defect loops back to **Step 4**.
 Delegate to the `build-lead` subagent. It writes `build-report.md`, updates the
 build run-log, and — if the build had to re-apply a known cure, took (or was
 tempted to take) a shortcut, or exposed a new repeatable build trap, and this
-project has a defect catalog configured — updates it. If you have a
-cross-project time/cost ledger skill installed and configured, `build-lead` may
-also refresh it and flag that a dashboard needs republishing (it can't publish
-it itself — it only touches files on disk). Capture its headline, including
-that flag.
-
-### Step 7.5 — Republish a time-ledger dashboard, if you have one and it was flagged
-This step only applies if your own setup includes a time-ledger dashboard
-skill. If `build-lead` reports the ledger was refreshed, republish the
-dashboard yourself (however your setup serves it — e.g. re-running its own
-publish step) **at its existing URL/location** (do not mint a new one) — this
-is the one step in team-build only the orchestrator (you) can do; `build-lead`
-updates the files, you publish them. Skip silently if `build-lead` flagged the
-refresh as failed/skipped/not-installed, or if you don't have this integration
-at all — non-blocking, don't hold up the build report over it.
+project has a defect catalog configured — updates it. Capture its headline.
 
 ### Step 8 — Report back (stop at green)
 Summarize for the user in chat:
@@ -198,7 +184,6 @@ Summarize for the user in chat:
   (`git -C <worktree-path> reset --hard <starting-commit>`).
 - Any **PENDING / PARKED decisions** still open (from `decisions.md`).
 - Links to `build-report.md`, `build-task-list.md`, and `decisions.md`.
-- Confirmation the time-ledger dashboard was republished (or why it wasn't).
 Then **stop** — do not commit, push, or open a PR. Ask whether the user wants
 to commit or hand it back for changes.
 

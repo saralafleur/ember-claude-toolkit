@@ -1,7 +1,7 @@
 ---
 name: team-release
 description: 'Run a small virtual release team (release-scribe, release-lead) over everything that shipped in a version and produce a client-facing release-notes.md — on any project. Use when: one or more team-build runs are done (verified green) and you want to tell the client what changed; you are cutting a version and need plain-language notes for a non-technical client; you want to bundle several work items into ONE client release doc; or you need release notes that are fact-checked against the actual shipped commits, not just what a report claimed. Produces a client-facing release-notes.md plus a private crosswalk mapping every note back to its item/commit/decision, and remembers each release in a release-log.'
-argument-hint: 'A version label (e.g. v0.7.3) and/or the folder(s) holding the shipped work. Optional — the skill will ask what is in the release if omitted.'
+argument-hint: '[<version/folders> | auto|auto-pilot <version/folders> | direct <version/folders>] — a version label (e.g. v0.7.3) and/or the folder(s) holding the shipped work. Optional — the skill will ask what is in the release if omitted. See "Run modes" for the auto-pilot/direct tokens.'
 ---
 
 # Team Release
@@ -48,24 +48,45 @@ delegate each role to a subagent. You are the release lead's editor.
 > name isn't a subagent type, fall back to `general-purpose` and paste the
 > role brief from `~/.claude/agents/<name>.md`.)
 
-## Process
+## Run modes
+
+Standard mode (bare `<version/folders>`) is the default described in
+"Process" below: both agents run, every 🟧 gate stops and waits. Two optional
+modes change that, and compose in either order:
+
+| Mode | Token(s) | What changes |
+|---|---|---|
+| Auto-pilot | `auto-pilot`, alias `auto` | Every gate in "Process" is tagged **PREFERENCE**, **QUALITY**, or **SHIP**. PREFERENCE gates no longer stop — the team decides on its own best recommendation, logs the choice to `decisions.md` as `DECIDED-AUTO`, and keeps going. The QUALITY gate (a client claim no commit supports) still stops, in every mode — a factual problem isn't something to auto-decide past. **The SHIP gate proceeds too** (Step 4): auto-pilot finalizes the notes and reports them ready rather than asking. This changes nothing about what the skill can actually *do* — it already never transmits anything itself (see the note above); "proceeds" just means it stops blocking on the question. |
+| Direct | `direct` | Accepted for consistency with the rest of the suite, but this skill's own roster is already minimal — one drafter, one fact-checker, neither droppable (the scribe has nothing to check without a draft; the fact-check is the whole reason this skill exists). `director-of-engineering` is not invoked here; `direct` behaves the same as standard mode for agent selection. |
 
 ### Step 0 — Establish the release scope (what shipped in this version)
 A release note is scoped to a **version**, which may bundle several work
 items.
-🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
+
+- Parse the skill argument for a leading mode token first — `auto`/
+  `auto-pilot` and/or `direct`, in either order, before the version/folders
+  (see "Run modes" above). Strip whatever mode tokens are present; whatever
+  remains is the scope.
+
+🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧 — **required-input, unaffected by any mode.**
 - Check `PROJECT-CONTEXT.md` for this project's version source of truth and
   where its delivery-pipeline artifacts (intake/build folders) live. If the
   user gave a version and/or folders, use them; otherwise ask: "What's in
   this release? Give me the version and the folder(s) or build(s) it covers."
+  No mode removes this gate — there's nothing to recommend when nothing at
+  all was given.
 - Determine the version from the project's version source of truth (per
   `PROJECT-CONTEXT.md`) unless the user names one.
 - Enumerate the **work items** in the release: each item's intake/build
   folder and its `build-report.md`. Confirm each item was actually built (a
   green build-report), and gather the commit range per repo touched.
-🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
+
+🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧 — **PREFERENCE gate.**
 - Do not invent scope. If it's unclear which items belong to this version,
-  ask.
+  ask. **Under auto-pilot,** auto-decide instead: default to every build
+  since the release-log's last entry that doesn't yet have a release,
+  log the resulting item list to `decisions.md` as `DECIDED-AUTO`, and state
+  it plainly in the Step 4 report-back rather than asking.
 
 ### Step 1 — Set up the output location
 Check `PROJECT-CONTEXT.md` for this project's convention on where release
@@ -89,8 +110,10 @@ jargon (including this project's own defect-catalog/decision-id patterns, if
 `PROJECT-CONTEXT.md` names any), confirms the version/date, finalizes the
 notes, updates the crosswalk with its verification result per note, and
 appends a row to the release-log.
-- If the lead finds a client claim **no commit supports**, that's a gate —
-  the notes do not ship with a false claim. Fix the wording or drop the line.
+- If the lead finds a client claim **no commit supports**, that's a
+  **QUALITY gate — stays in every mode, including auto-pilot.** The notes do
+  not ship with a false claim, ever; fix the wording or drop the line. There's
+  no "best recommendation" for a claim that isn't true.
 
 ### Step 4 — Report back
 Summarize for the user in chat:
@@ -100,8 +123,15 @@ Summarize for the user in chat:
 - Confirmation the notes are **jargon-clean** and **version-correct**.
 - Links to `release-notes.md` (the deliverable) and `release-crosswalk.md`
   (internal).
-🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
+- **Under auto-pilot:** also list every `DECIDED-AUTO` entry from this run —
+  "Decided automatically (auto-pilot): N items — see decisions.md."
+
+🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧 — **SHIP gate.**
 Then ask whether the user wants to send the notes, edit them, or hold.
+**Under auto-pilot,** skip the ask: report the notes as finalized and ready
+to send instead of waiting — this skill still never transmits anything
+itself in any mode, so "proceeding" here just means not blocking on the
+question.
 
 ## Decision logging
 If a genuine choice goes to the user during a release (e.g. "bundle these two
@@ -126,7 +156,7 @@ before asking, DECIDED after.
   applies in the same report-back, each gets its own banner + callout — do not
   merge them into a single generic "want me to proceed?".
 - **When a gate offers a choice in plain chat text (not via `AskUserQuestion`),
-  letter the options** — `**A)**`, `**B)**`, `**C)**`, etc. — so Sara can
+  letter the options** — `**A)**`, `**B)**`, `**C)**`, etc. — so the user can
   answer with a single letter instead of re-describing the option. A gate
   with only one path (a plain yes/no "proceed?") doesn't need lettering —
   this is for genuine multi-way choices.

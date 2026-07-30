@@ -10,7 +10,7 @@
 //   node scripts/install.mjs <tool> [plugin-name|--all] [--local]
 //
 //   tool          cursor | gemini | antigravity
-//   plugin-name   delivery-team | librarian | time-ledger | dev-workflow | story-map
+//   plugin-name   delivery-team | librarian | dev-workflow | story-map | product-analyst
 //                 (omit, or pass --all, to install every plugin)
 //   --local       install into the current directory's project-level config
 //                 instead of your user-global config. Not used by gemini,
@@ -32,7 +32,7 @@ const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..');
 const PLUGINS_DIR = join(REPO_ROOT, 'plugins');
 
-const ALL_PLUGINS = ['delivery-team', 'librarian', 'time-ledger', 'dev-workflow', 'story-map'];
+const ALL_PLUGINS = ['delivery-team', 'librarian', 'dev-workflow', 'story-map', 'product-analyst'];
 const TOOLS = ['cursor', 'gemini', 'antigravity'];
 
 function usage() {

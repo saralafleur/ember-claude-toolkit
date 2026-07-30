@@ -3,6 +3,11 @@ name: build-planner
 description: Build planner for the team-build process. Turns the approved technical-plan (what to change) and test-plan (what to prove) into ONE ordered, dependency-correct task list the implementer can execute step by step — and marks every durable-cure step MANDATORY so a structural fix can't be quietly dropped for an inline shortcut. Runs after triage, before any code changes. Generic — works on any project; reads that project's PROJECT-CONTEXT.md for defect-class conventions when present.
 ---
 
+> **Path note (plugin install):** this file assumes an Antigravity install
+> rooted at `~/.gemini/config/plugins/delivery-team/`; if your actual install
+> differs, treat every path below as relative to this plugin's own bundled
+> `skills/team-build/...` folder instead.
+
 _This agent reads and searches files, runs shell commands to inspect the project, and writes the build task list; it does not edit product code._
 
 

@@ -1,7 +1,7 @@
 ---
 name: team-intake
 description: 'Run a virtual delivery team (triage, product owner, architect, engineer, QA, project manager, tech lead) over an incoming client request — on any project. Use when: a new feature/bug/change request comes in and needs to be understood, classified, and turned into a plan before any code is written; you have a file or folder describing what a client wants; you want intake/triage of a request; you need a technical plan AND a project-manager plan; or you want to know "have we seen this request before?" before acting. Produces a technical plan and a PM plan per request and remembers recurring issues (when the project has a defect catalog configured) so the team stops going in circles.'
-argument-hint: 'Path to the intake base folder (holds the request; an `intake/` subfolder is created inside it for the plans). Optional — will ask if omitted.'
+argument-hint: '[<path> | auto|auto-pilot [direct] <path> | direct [auto] <path>] — path to the intake base folder (holds the request; an `intake/` subfolder is created inside it for the plans). Optional — will ask if omitted. See "Run modes" for the auto-pilot/direct tokens.'
 ---
 
 # Team Intake
@@ -48,6 +48,23 @@ and delegate each role to a subagent. You are the delivery lead.
 > as a subagent type, fall back to a `general-purpose` agent and paste the
 > role brief from `~/.claude/agents/<name>.md`.)
 
+## Run modes
+
+Standard mode (bare `<path>`) is the default described in "Process" below:
+the fixed 8-agent roster, every 🟧 gate stops and waits. Two optional modes
+change that, and compose in either order (`auto direct <path>` /
+`direct auto <path>`):
+
+| Mode | Token(s) | What changes |
+|---|---|---|
+| Auto-pilot | `auto-pilot`, alias `auto` | Every gate in "Process" is tagged **PREFERENCE**, **QUALITY**, or **required-input**. PREFERENCE gates no longer stop — the team decides on its own best recommendation, logs the choice to `decisions.md` as `DECIDED-AUTO`, and keeps going. QUALITY gates (an actually-`BLOCKED` verdict) still stop, in every mode — there's no recommendation to make when the request itself isn't understood. |
+| Direct | `direct` | Right after Step 2's triage returns `READY`, run `director-of-engineering` with this skill's own roster (the table above) instead of the fixed Step 3 fan-out; execute exactly the agents/order it returns in place of Steps 3–5. |
+
+Both modes still write every artifact this skill normally writes, to the same
+paths — `direct` just produces fewer `supporting/*.md` files (only for the
+agents actually run), and `auto-pilot` still writes `decisions.md`, just with
+`DECIDED-AUTO` entries instead of a stop.
+
 ## Process
 
 ### Step 0 — Get the intake base folder (and the request inside it)
@@ -55,14 +72,20 @@ The provided folder is the **intake base folder**: it holds the request
 materials *and* is where the plans get written (under an `intake/`
 subfolder).
 
+- Parse the skill argument for a leading mode token first — `auto`/
+  `auto-pilot` and/or `direct`, in either order, before the path (see "Run
+  modes" above). Strip whatever mode tokens are present; whatever remains is
+  the folder.
 - If the user gave a folder path (as the skill argument or in the message),
   use it as the intake base folder. The request materials (ticket, email,
   doc, screenshots) live in this folder. (If they pointed at a single file
   instead, treat that file's parent folder as the base folder.)
-🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
+
+🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧 — **required-input, unaffected by any mode.**
 - **If no folder was given, STOP and ask:** "Which folder should I work in?
   Point me at the folder that holds the request — I'll create an `intake/`
-  subfolder inside it for the plans."
+  subfolder inside it for the plans." No mode removes this gate — there's
+  nothing to recommend a location for.
 - Do not invent a request or a location.
 
 ### Step 1 — Set up the intake folder
@@ -75,10 +98,20 @@ subfolder).
 ### Step 2 — Triage (gate)
 Run `intake-triage` on the source → it writes `request-brief.md` and returns
 a `READY` / `BLOCKED` verdict.
-🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
+
+**If `direct` was requested:** once triage returns `READY`, run
+`director-of-engineering` now with this skill's own roster (the table under
+"The team") instead of the fixed Step 3 fan-out below — it writes
+`run-plan.md`; execute exactly the agents/order it returns in place of
+Steps 3–5.
+
+🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧 — **QUALITY gate, stays in every mode,
+including auto-pilot.**
 - If **BLOCKED**, surface its blocking questions to the user with
   `AskUserQuestion` (or plain text) and wait. **Do not run the rest of the
-  team on a request nobody understands.**
+  team on a request nobody understands.** A `BLOCKED` verdict means the
+  premise is actually unclear — auto-pilot has no "best recommendation" for a
+  request nobody has pinned down, so it stops here too.
 - **Log every clarifying/blocking question and its answer** (see "Decision
   logging" below) — before you ask, record the question + dated context +
   options as `PENDING`; when the user answers, update it to `DECIDED` with
@@ -107,17 +140,22 @@ Run `intake-tech-lead` with the brief, the three supporting files
 `technical-plan.md`.
 
 ### Step 6 — Report back
-Regenerate and (re)publish this initiative's SDLC journey artifact first
-(see "Time logging" below), then summarize for the user in the chat:
+Summarize for the user in the chat:
 - Request **type** and **"seen before?"** (cite the defect-catalog id if
   matched and this project has one configured).
 - The PM's headline recommendation (esp. the cycle-breaker if recurring).
 - The technical approach in 2–3 bullets.
 - Any **PENDING / PARKED decisions** still open (from `decisions.md`).
-- Links to `pm-plan.md`, `technical-plan.md`, `decisions.md`, and the
-  journey artifact URL.
-🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
+- **Under auto-pilot:** also list every `DECIDED-AUTO` entry from this run —
+  "Decided automatically (auto-pilot): N items — see decisions.md."
+- Links to `pm-plan.md`, `technical-plan.md`, and `decisions.md`.
+
+🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧 — **PREFERENCE gate.**
 Then ask whether to proceed to implementation (out of scope for this skill).
+**Under auto-pilot,** skip the ask: default to "yes, proceed to `team-qa`
+next" (unblocking the next stage is this skill's whole purpose), log it to
+`decisions.md` as `DECIDED-AUTO`, and say so plainly in the summary above
+instead of waiting.
 
 ### Step 7 — Client approval sheet (optional, on demand)
 When sign-off items need to go to a non-technical client, run
@@ -148,47 +186,6 @@ if the user defers it to a stakeholder) once they answer. The PM reads the
 decision-log during history reconstruction, so a question answered once
 stays answered.
 
-## Time logging
-Every subagent Agent() call returns a `<usage>` block with `duration_ms` /
-`subagent_tokens` / `tool_uses` the instant it completes — this is real
-compute-time data that would otherwise vanish once the turn moves on, and it
-is the only record of how much work a background subagent actually did (main-
-loop session transcripts, which `time-ledger`'s cross-project dashboard reads,
-never see it). Persist it as you go:
-
-- **Right after every Agent() call's completion notification**, run:
-  ```
-  python3 ~/.claude/skills/time-ledger/scripts/log_agent_time.py \
-    --cycle-dir "<intake-base>/intake/<date>-<slug>" \
-    --phase "<this step's name, e.g. 'Evaluate'>" \
-    --role "<subagent_type used>" \
-    --label "<the task description given to Agent()>" \
-    --duration-ms <duration_ms> --tokens <subagent_tokens> --tool-uses <tool_uses>
-  ```
-  If an agent was interrupted/killed before a usage block arrived, log it
-  anyway with `--status killed` and no `--duration-ms` — an honest gap beats
-  a silently missing record (see the script's own docstring).
-- **At Step 6**, render/refresh the SDLC journey artifact (this initiative's
-  whole intake → QA → build → merge picture, not just this stage) and publish
-  it — same file path both times, so it redeploys to the same URL as the
-  initiative progresses through later stages:
-  ```
-  python3 ~/.claude/skills/time-ledger/scripts/journey_report.py \
-    --initiative-root "<intake-base>/intake/<date>-<slug>" \
-    --title "<short initiative title>" --project "<project name>" \
-    --summary "<one-line synopsis>" \
-    --stage-note intake="<PM's headline recommendation, one line>"
-  ```
-  Then call the `Artifact` tool on the resulting
-  `<intake-base>/intake/<date>-<slug>/sdlc-journey.html` (title, a one-line
-  description, and a favicon emoji fitting the project). Check for
-  `<intake-base>/intake/<date>-<slug>/artifact-url.txt` first — if it exists
-  (a later stage running in a fresh session, or a re-run), pass its contents
-  as the `Artifact` tool's `url` parameter so this redeploys to the *same*
-  artifact instead of minting a new one. After publishing, write the
-  returned URL to that same `artifact-url.txt` (create or overwrite) so
-  team-qa/team-build can find it later, from any session.
-
 ## Conventions
 - **Human gates must be visible, not just asked.** At every 🟧 HUMAN GATE
   REQUIRED point, present the question as its own standalone callout in the
@@ -204,7 +201,7 @@ never see it). Persist it as you go:
   applies in the same report-back, each gets its own banner + callout — do not
   merge them into a single generic "want me to proceed?".
 - **When a gate offers a choice in plain chat text (not via `AskUserQuestion`),
-  letter the options** — `**A)**`, `**B)**`, `**C)**`, etc. — so Sara can
+  letter the options** — `**A)**`, `**B)**`, `**C)**`, etc. — so the user can
   answer with a single letter instead of re-describing the option. A gate
   with only one path (a plain yes/no "proceed?") doesn't need lettering —
   this is for genuine multi-way choices.

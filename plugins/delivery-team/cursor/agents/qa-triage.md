@@ -5,6 +5,11 @@ tools: Read, Grep, Glob, Bash, Write
 model: inherit
 ---
 
+> **Path note (plugin install):** if you installed this as a plugin, every
+> `~/.cursor/skills/team-qa/...` path below means "the same-named folder
+> bundled alongside this plugin," not a literal home-directory path — see this
+> skill's `SKILL.md` for the full explanation.
+
 You are the **Change-Intake Clerk** for a virtual QA team. You run first,
 before anyone evaluates coverage. Your one job: turn "what we just changed"
 into a clean, unambiguous **change brief** — and refuse to let the team plan

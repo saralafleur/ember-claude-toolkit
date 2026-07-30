@@ -1,0 +1,8 @@
+{
+  "name": "product-analyst",
+  "description": "Runs a virtual product team over any web solution \u2014 a local repo/folder, or a described live app \u2014 and produces one ranked top-10 list of what to build next: `product` for feature/end-user recommendations, `tech` for technical/hardening recommendations. Triage profiles the solution, three specialists (UX, technical, market) propose evidence-grounded candidate features in parallel, an independent validator cross-checks every candidate twice (blind to each other), and a lead reconciles both passes into the requested ranked top 10.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Sara LaFleur"
+  }
+}
