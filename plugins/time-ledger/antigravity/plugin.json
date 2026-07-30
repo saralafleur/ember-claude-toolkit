@@ -1,5 +1,0 @@
-{
-  "name": "time-ledger",
-  "version": "1.0.0",
-  "description": "Cross-project time, token, and cost ledger built from Claude Code session transcripts. Scans local session transcripts to produce daily/weekly/monthly hour, token, and cost rollups per project and branch, a calendar-week dashboard, and per-initiative SDLC journey artifacts. Output directory and subscription billing details are configurable via environment variables."
-}
