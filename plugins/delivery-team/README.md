@@ -115,10 +115,6 @@ mean "the same folder bundled alongside this file" under Option A.
 
 ## Notes
 
-- `team-build`'s `SKILL.md` mentions an optional integration with a
-  time-cost-ledger dashboard — that's not part of this package; it's a no-op
-  unless you have your own such skill installed and configured. Safe to
-  ignore or delete that step if you don't.
 - None of these teams commit, push, or send anything on your behalf.
   `team-build` stops at a green diff in an isolated worktree; `team-release`
   stops at a drafted, fact-checked `release-notes.md`. Every "send/merge/ship"
