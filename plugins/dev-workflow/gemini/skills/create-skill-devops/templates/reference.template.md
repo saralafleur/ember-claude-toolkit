@@ -9,7 +9,7 @@ Run the audit script (at `scripts/{{command}}-check.sh` under this skill's
 base directory) and show the user the table:
 
 ```bash
-zsh <skill-base-dir>/scripts/{{command}}-check.sh
+bash <skill-base-dir>/scripts/{{command}}-check.sh
 ```
 
 If every build-relevant row is `ok`, report "environment is already set up",

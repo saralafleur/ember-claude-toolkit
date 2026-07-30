@@ -61,7 +61,8 @@ It must contain:
    once. Judge whether that's actually worth doing this run:
    - **Candidate pool:** from the stage-map, take only items whose next step
      is a genuine `team-build` (a real code change). Exclude anything whose
-     next step is documentation-only, a `librarian` capture, or blocked on a
+     next step is documentation-only, a `librarian` capture (if that plugin is
+     installed), or blocked on a
      PENDING/PARKED decision — those aren't worktree efforts and don't
      belong in this analysis.
    - **Independence:** reuse the file-footprint comparison from the
@@ -94,7 +95,8 @@ It must contain:
      anything.
 7. **The recommended next action** — the point of the skill. Name **one**
    primary next step: *which skill to invoke* (`team-intake` / `team-qa` /
-   `team-build` / `librarian`), *on which exact folder(s)*, and *why*, citing
+   `team-build`, or `librarian` if that plugin is also installed), *on which
+   exact folder(s)*, and *why*, citing
    the specific gap that makes it the next step. If the Parallelization
    opportunity section above found two or more independent candidates, this
    next action is still singular at the *skill* level (`team-build`) but
@@ -105,7 +107,8 @@ It must contain:
    `intake-only` → run `team-qa`; `qa-done` → run `team-build`;
    `build-green-with-caveats` / `stale` → re-verify or finish the caveat,
    often another `team-build` or a targeted manual step; a documentation-only
-   gap → note it (and consider `librarian` to capture durable lessons). Don't
+   gap → note it (and consider `librarian` to capture durable lessons, if that
+   plugin is installed). Don't
    invent a step the evidence doesn't support.
 8. **Note what you did NOT do** — this skill is read-only; state that no
    plan, test, or product code was changed, so the reader knows the report is
@@ -144,7 +147,8 @@ relays to the user.
 ## Grounding
 - The skills you can recommend invoking: `team-intake` (plan a change),
   `team-qa` (plan tests for a built change), `team-build` (build an approved
-  plan), `librarian` (capture durable knowledge) — all installed globally.
+  plan), `librarian` (capture durable knowledge), if that plugin is installed
+  — treat it as optional, not a given.
 - Stage → artifact map: `technical-plan.md`/`pm-plan.md` = intake done;
   `qa/test-plan.md`+`qa-assessment.md` = qa done; `build/**/build-report.md` =
   build done (verify its claims — see the scanners' findings).

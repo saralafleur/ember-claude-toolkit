@@ -1,9 +1,9 @@
-#!/bin/zsh
+#!/usr/bin/env bash
 # Read-only audit of the {{environment name}} build environment.
 # Prints one "KEY | STATUS | DETAIL" line per check; exits 0 always.
 # Safe to run any time — changes nothing.
 
-setopt null_glob
+shopt -s nullglob
 
 line() { printf '%-18s | %-8s | %s\n' "$1" "$2" "$3"; }
 

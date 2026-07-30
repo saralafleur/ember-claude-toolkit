@@ -24,9 +24,7 @@ to the library or to the librarian's own files without the user's approval.
 > Delegate to each by name (invoke with `@<name>`, or let automatic delegation
 > match the task to the subagent's description). If a name isn't registered as
 > a subagent, paste the role brief from that agent's file instead, which lives
-> next to the other `librarian-*` agent files wherever this skill was installed
-> from (alongside this skill, or in `~/.gemini/agents/` for a loose,
-> non-extension install).
+> in the `agents/` folder next to where this skill was installed from.
 
 ## Library layout (at `<library-root>`, shared by many repos)
 ```

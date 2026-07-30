@@ -3,12 +3,11 @@ name: story-map-scaffold-generator
 description: >
   Generates a complete, populated UAT story map folder structure for a new application repository from first principles. Use this skill whenever someone wants to bootstrap a story map, scaffold UAT test files, create role-based workflow test scripts, generate happy-path test scripts, or set up a UAT execution framework for an application. Trigger whenever the user mentions: story map, UAT scaffold, test scaffold, happy path generation, UAT agent setup, UAT run sheet, role-based test coverage, or wants to prepare an application for UAT testing. Also use when the user wants to discover application roles and routes and turn them into structured test documentation. This skill is essential any time the phrase "story map" or "UAT scaffold" appears — even casually.
 tools: ["codebase", "search", "editFiles", "runCommands"]
-model: gpt-5
+model: inherit
 user-invocable: true
 ---
 <!-- assumption: VS Code / GitHub Copilot Agent Plugins are Preview and the frontmatter schema is still in flux. Assumed keys: name, description, tools (array of Copilot tool ids), model, user-invocable. -->
 <!-- assumption: tool ids map Claude Read/Grep/Glob -> "codebase"+"search" (Copilot's codebase read/search tools), Write/Edit -> "editFiles", Bash -> "runCommands". Exact id spellings may differ in the shipped schema. -->
-<!-- assumption: model "gpt-5" is a placeholder for the deployment's default high-capability model; adjust to an available model id. -->
 <!-- assumption: bundled reference/eval files live alongside this agent under .github/references/ and .github/evals/, so this agent points at them via ../references/ and ../evals/ relative paths. -->
 
 # Story Map Scaffold Generator

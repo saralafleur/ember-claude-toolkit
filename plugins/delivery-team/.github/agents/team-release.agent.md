@@ -5,7 +5,7 @@ description: 'Run a small virtual release team (release-scribe, release-lead) ov
 # subagents this orchestrator may delegate to; `user-invocable` and the tool identifiers
 # below are best-effort mappings from the Claude tool set and may need tuning per workspace.
 tools: ['codebase', 'search', 'editFiles', 'runCommands']
-model: gpt-5
+model: inherit
 user-invocable: true
 agents: ['release-lead', 'release-scribe']
 ---

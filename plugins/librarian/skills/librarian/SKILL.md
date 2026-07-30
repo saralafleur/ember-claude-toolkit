@@ -23,9 +23,8 @@ to the library or to the librarian's own files without the user's approval.
 
 > Launch each with `subagent_type: "<name>"`. If a name isn't available as a
 > subagent type, fall back to a `general-purpose` agent and paste the role brief
-> from that agent's file, which lives next to the other `librarian-*` agent
-> files wherever this skill was installed from (alongside this skill, or in
-> `~/.claude/agents/` for a loose, non-plugin install).
+> from that agent's file, which lives in the `agents/` folder next to where
+> this skill was installed from.
 
 ## Library layout (at `<library-root>`, shared by many repos)
 ```

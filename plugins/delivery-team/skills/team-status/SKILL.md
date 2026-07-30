@@ -325,7 +325,8 @@ more ready-to-build items are independent enough to run as concurrent
 `team-build` worktree efforts, laid out as an Option A: concurrent / Option
 B: sequential trade-off — never a unilateral pick), and — the point of the
 whole skill — **the single recommended next action**: *which skill to invoke
-(`team-intake` / `team-qa` / `team-build` / `librarian`), on which folder,
+(`team-intake` / `team-qa` / `team-build`, or `librarian` if that plugin
+   is also installed), on which folder,
 and why*, citing the concrete gap. It also appends one row to the status
 run-log. Capture its headline recommendation and, if present, the
 parallelization choice verbatim.

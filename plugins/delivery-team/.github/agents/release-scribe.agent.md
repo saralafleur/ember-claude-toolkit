@@ -4,7 +4,7 @@ description: Client-facing release-notes writer for the team-release process. Tu
 # assumption (Preview): tool identifiers are a best-effort mapping from the Claude tool set
 # (Read/Grep/Glob/Write/Edit). No `runCommands` — verification against git is the lead's job.
 tools: ['codebase', 'search', 'editFiles']
-model: gpt-5
+model: inherit
 user-invocable: false
 disable-model-invocation: false
 ---

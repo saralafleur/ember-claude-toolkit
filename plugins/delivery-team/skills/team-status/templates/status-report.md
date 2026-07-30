@@ -113,7 +113,8 @@ build-ready items exist — state that plainly instead of forcing a choice.)_
 ## Recommended next action
 
 **→ Invoke `<team-intake | team-qa | team-build | librarian>` on
-`<exact folder path>`.**
+`<exact folder path>`.** (`librarian` only applies if that plugin is
+installed alongside `delivery-team`.)
 
 **Why:** <the specific gap that makes this the next step, citing the item and, if
 it closes a recurring issue, the RI-id.>

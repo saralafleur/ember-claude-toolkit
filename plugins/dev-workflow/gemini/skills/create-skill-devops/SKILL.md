@@ -197,7 +197,7 @@ Rules that must survive templating:
   square brackets — and is updated every time a command is added.
 - Scripts are referenced relative to the skill's base directory (announced at
   invocation), never by absolute path — project skills must survive cloning.
-- The check script starts with `setopt null_glob` (zsh) and always exits 0.
+- The check script starts with `shopt -s nullglob` (bash, portable to Linux) and always exits 0.
 - Research real download sizes / disk requirements for the plan table —
   don't invent numbers; mark unknown ones "verify at install time".
 

@@ -16,7 +16,7 @@ skill manages in right now?" Never installs, fixes, or changes anything.
 2. **Run** — execute each audit script (they are all read-only and exit 0):
 
    ```bash
-   zsh <skill-base-dir>/scripts/<command>-check.sh
+   bash <skill-base-dir>/scripts/<command>-check.sh
    ```
 
 3. **Report** — for each command show:

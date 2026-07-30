@@ -1,10 +1,10 @@
-#!/bin/zsh
+#!/usr/bin/env bash
 # Read-only audit of build/run state for {{PROJECT}}'s lifecycle solutions.
 # Shared by the build/up/down/remove commands. Prints one
 # "KEY | STATUS | DETAIL" line per check; exits 0 always. Safe to run any
 # time — changes nothing.
 
-setopt null_glob
+shopt -s nullglob
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/../../../.." && pwd)"
 cd "$PROJECT_ROOT" || exit 0

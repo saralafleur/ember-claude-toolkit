@@ -4,7 +4,7 @@ description: Release Lead / synthesizer for the team-release process. Runs last,
 # assumption (Preview): tool identifiers are a best-effort mapping from the Claude tool set
 # (Read/Grep/Glob/Bash/Write/Edit). `runCommands` covers the git verification this role needs.
 tools: ['codebase', 'search', 'editFiles', 'runCommands']
-model: gpt-5
+model: inherit
 user-invocable: false
 disable-model-invocation: false
 ---

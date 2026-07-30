@@ -22,7 +22,7 @@ an app's own dev script needs.
 ## Shared audit (Phase 1 for all four actions below)
 
 ```bash
-zsh <skill-base-dir>/scripts/{{lifecycle-check-name}}.sh
+bash <skill-base-dir>/scripts/{{lifecycle-check-name}}.sh
 ```
 
 Prints, per solution: whether its build artifact exists — image built/pulled,

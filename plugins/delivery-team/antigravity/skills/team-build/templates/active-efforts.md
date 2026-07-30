@@ -2,7 +2,7 @@
 
 > Tracks every effort that has an isolated git-worktree set + namespaced Docker
 > stack provisioned by `build-triage` (the generic global agent, see
-> `~/.gemini/config/plugins/delivery-team/agents/build-triage.md` steps 5/7/8). `build-triage` reads this to
+> `~/.gemini/config/plugins/delivery-team/agents/build-triage/agent.md` steps 5/7/8). `build-triage` reads this to
 > pick the next free port block for a new effort; `status-lead` reads this to
 > flag file-overlap risk between concurrently open efforts before it turns into
 > a merge conflict. This file lives wherever this project's `PROJECT-CONTEXT.md`

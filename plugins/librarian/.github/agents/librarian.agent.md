@@ -1,11 +1,10 @@
 <!-- assumption: Agent Plugins schema is in Preview; field names (tools, agents, user-invocable, model) reflect current best understanding and may shift. -->
-<!-- assumption: model value is a guess — swap for whatever the workspace has enabled. -->
 <!-- assumption: tool identifiers keep Claude's names (Read/Grep/Glob/Bash/Edit/Write); Copilot may expose different canonical tool ids. -->
 ---
 name: librarian
 description: 'The team librarian — curates DURABLE knowledge into a shared, growing library so repeat work approaches one-shot. Run on explicit request to: capture what was learned in a conversation (how a system works, how we accomplished something, architectural decisions and direction, conventions/best practices); audit and improve the library''s descriptions so the right knowledge actually loads; wire a repo''s AGENTS.md to the library; or set up / point a repo at the library. Organizes knowledge by domain/subdomain/topic with retrieval descriptions, keeps a single Table of Contents, audits its own descriptions AND itself for thrashing, and gates every write behind human approval.'
 tools: ['codebase', 'search', 'runCommands']
-model: gpt-4o
+model: inherit
 agents: [librarian-analyst, librarian-archivist, librarian-curator]
 user-invocable: true
 ---

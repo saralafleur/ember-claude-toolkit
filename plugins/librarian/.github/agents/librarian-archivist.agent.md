@@ -1,9 +1,8 @@
-<!-- assumption: Agent Plugins schema is in Preview; model value is a guess, swap for a workspace-enabled model. -->
 ---
 name: librarian-archivist
 description: The SOLE writer for the librarian. After the user approves, it commits knowledge entries under the library, regenerates the Table of Contents from entry frontmatter, applies approved description/taxonomy/self-improvement changes, and records everything in the audit logs (content changes and librarian self-changes). It also performs first-run library scaffolding and repo wire-up. Never decides what to write — it applies only what was approved, flawlessly and in full.
 tools: ['codebase', 'search', 'runCommands', 'editFiles']
-model: gpt-4o
+model: inherit
 user-invocable: false
 disable-model-invocation: false
 ---

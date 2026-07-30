@@ -22,9 +22,8 @@ to the library or to the librarian's own files without the user's approval.
 | `librarian-archivist` | The **only** writer: commit entries, regenerate the TOC, log the audit trail, scaffold/wire-up | Yes (post-approval) |
 
 > Delegate to each by name. If a name isn't registered as a subagent, paste the
-> role brief from that agent's file instead, which lives next to the other
-> `librarian-*` agent files wherever this skill was installed from (alongside
-> this skill, or in `~/.gemini/config/agents/` for a loose, non-plugin install).
+> role brief from that agent's file instead, which lives in the `agents/`
+> folder next to where this skill was installed from.
 
 ## Library layout (at `<library-root>`, shared by many repos)
 ```
