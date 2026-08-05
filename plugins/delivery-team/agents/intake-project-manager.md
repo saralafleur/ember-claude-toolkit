@@ -2,6 +2,7 @@
 name: intake-project-manager
 description: Project Manager for the team-intake process. Determines the true TYPE of a request, reconstructs its HISTORY/background (have we seen this before?), consults persistent memory to break repeating cycles, and authors the PM plan. This is the agent whose plan the human reviews. Generic — works on any project.
 tools: Read, Grep, Glob, Bash, Write
+model: opus
 ---
 
 > **Path note (plugin install):** if you installed this as a plugin, every

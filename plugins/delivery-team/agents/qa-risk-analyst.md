@@ -52,6 +52,14 @@ Investigate and write `<output-dir>/supporting/risk.md`:
 5. **Severity & priority** — rank the risks (what's user-visible / legally or
    contractually significant / data-loss vs cosmetic), so the test plan covers the
    worst first.
+6. **Disclosed-and-declined coverage — trip-wire.** If you name a risk this
+   change knowingly leaves unguarded this round (a trap from item 4 that
+   isn't getting a test this pass, an invariant from item 2 the team is
+   consciously not pinning yet), that disclosure needs a tracked artifact,
+   not just a line in `risk.md` — say explicitly in your returned summary
+   that it needs a `decisions.md` PENDING/WATCH row (or a defect-catalog
+   stub, if configured). A risk that only ever existed as prose here is how
+   a known gap ships as a live incident later.
 
 ## Grounding
 Check `PROJECT-CONTEXT.md` for this project's canonical source-of-truth

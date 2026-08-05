@@ -1,6 +1,6 @@
 ---
 name: team-status
-description: 'Run a virtual delivery-status team over a folder in a project''s delivery pipeline and answer "where are we, and what do we invoke next?" — on any project. Use when: you open a batch or an intake-base folder and need to know the true current state of every work item in it; a plan/report might be stale and you want it re-verified against the live code, not just re-read; you are picking up work someone else (or a past session) produced and need to reconstruct it; or you want a single, current status-report.md that says which of team-intake / team-qa / team-build / librarian to run next and why. Also trigger on short, bare prompts asking to reconstruct current state and the next step — e.g. "next", "next?", "what''s next", "where are we", "where are we at", "status check", "status" — even with no folder named (Step 0 resolves the folder from PROJECT-CONTEXT.md or asks). Produces one status-report.md per run and a thin run-log, and it NEVER changes product code, plans, or tests — it is read-only and advisory.'
+description: 'Run a virtual delivery-status team over a folder in a project''s delivery pipeline and answer "where are we, and what do we invoke next?" — on any project. Use when: you open a batch or an intake-base folder and need to know the true current state of every work item in it; a plan/report might be stale and you want it re-verified against the live code, not just re-read; you are picking up work someone else (or a past session) produced and need to reconstruct it; or you want a single, current status-report.md that says which of team-intake / team-qa / team-build / librarian to run next and why. Also trigger on short, bare prompts asking to reconstruct current state and the next step — e.g. "next", "next?", "what''s next", "where are we", "where are we at", "status check", "status" — even with no folder named (Step 0 resolves the folder from PROJECT-CONTEXT.md or asks). Produces one status-report.md per run and a thin run-log, and it NEVER changes product code, plans, or tests — it is read-only and advisory (except its own local, docs-only commits — see Step 4.5).'
 argument-hint: '[<path> | auto|auto-pilot <path> | direct <path>] — path to the folder to assess (a whole batch, or a single intake-base folder). Optional — will ask if omitted. See "Run modes" for the auto-pilot/direct tokens.'
 ---
 
@@ -36,9 +36,10 @@ behind the one durable status artifact the pipeline was missing.
 
 This skill is an **orchestration**: you (the main agent) run the phases below
 and delegate each role to a subagent. You are the status lead. **This team is
-strictly read-only** — it reads code, runs *existing* tests/greps to verify
-claims, and writes only its own report + run-log. It never edits product
-code, a plan, a test, or another team's memory.
+strictly read-only** (except its own local, docs-only commits — see
+Step 4.5) — it reads code, runs *existing* tests/greps to verify claims, and
+writes only its own report + run-log. It never edits product code, a plan, a
+test, or another team's memory.
 
 ## The team (first-class agents, installed globally at `~/.claude/agents/`)
 | Agent | Role |
@@ -135,13 +136,32 @@ still happens, just only when something has actually moved.
      *output* of the last scan, not a change to detect; without the
      exclusion every run would falsely detect "change" from its own
      previous scratch writes.)
-3. **If both checks are empty everywhere** — nothing changed anywhere in the
-   target or the product repos since the cached report was written — skip
-   triage and scanning entirely. Read the existing `status-report.md` and
-   present its stage-map and recommended next action to the user as-is (see
-   Step 4's "fully cached" variant). State the report's timestamp and that
-   nothing has changed since. Stop here — do not launch any agent.
-4. **If either check finds anything**, proceed to Step 1 (triage) as
+   - **Shared cross-team docs.** `<target>` and the product-code repos
+     aren't the only place a load-bearing claim can go stale — a decision,
+     a defect-catalog entry, or a request-log row can flip in a shared doc
+     that lives entirely outside `<target>` (a project's cross-request
+     `decision-log.md`, its recurring-issue/defect catalog, its
+     `request-log.md`). A `status-report.md`'s own recommended-next-action
+     routinely cites these, so a change there is exactly as load-bearing as
+     a change under `<target>` itself — treating it as out of scope is how
+     a cached report ends up citing a decision as still PENDING after it
+     was actually ruled. For every path `PROJECT-CONTEXT.md` names as a
+     shared decision-log / defect-catalog / request-log / run-log /
+     release-log location, run the same two checks against it (`git log
+     --since="<LAST_RUN>" --oneline -1 -- <path>`, `git status --porcelain
+     -- <path>`), scoped to whichever repo actually contains it. Any hit
+     counts the same as a hit under `<target>`. A cached "not yet released"
+     claim about an item is exactly this kind of load-bearing fact — don't
+     let it go stale just because the change landed in `release-log.md`
+     instead of `decision-log.md`.
+3. **If all checks are empty everywhere** — nothing changed anywhere in the
+   target, the product repos, or the shared cross-team docs since the cached
+   report was written — skip triage and scanning entirely. Read the
+   existing `status-report.md` and present its stage-map and recommended
+   next action to the user as-is (see Step 4's "fully cached" variant).
+   State the report's timestamp and that nothing has changed since. Stop
+   here — do not launch any agent.
+4. **If any check finds anything**, proceed to Step 1 (triage) as
    normal — something needs a closer look, but exactly *what* gets scoped
    precisely in Step 1.5, not assumed to be everything.
 
@@ -234,10 +254,10 @@ silent default.
 6. **Ask before scanning.** Tell the user the split, and call out any items
    step 5 downgraded so that's visible, not silent: e.g. *"12 items unchanged
    since the last run (cache trusted), 2 items touched but confirmed
-   cosmetic by fingerprint re-check (cache trusted): `<item-slug-a>`
-   (added a doc pointer, no claim changed), `<item-slug-b>`
+   cosmetic by fingerprint re-check (cache trusted): `uat-061826-topr-changes`
+   (added a doc pointer, no claim changed), `committee-about-restructure`
    (build-report touched but verdict/decisions/test-numbers unchanged) — 1
-   item shows a real change: `<item-slug-c>` (verdict text
+   item shows a real change: `getmodsbyoffice-idor-scoping-gap` (verdict text
    in build-report.md changed)."* Then use `AskUserQuestion` with three
    options:
    - **Rescan only the flagged items (recommended)** — launch scanners for
@@ -247,7 +267,13 @@ silent default.
      reuse the stale scratch/report content for everything, explicitly
      flagged as unverified-since-`LAST_RUN` in the output.
    - **Force full rescan of all items** — ignore SKIP/RESCAN-CANDIDATE
-     entirely, scanner on every item regardless of what changed.
+     entirely, scanner on every item regardless of what changed. **Caution
+     on large batches:** a big force rescan launches that many concurrent
+     scanners against the same shared dev/test stack, and concurrent test
+     runs can produce transient contention that looks like a new failure.
+     A "finding" that shows up only in a force-rescan and isn't corroborated
+     by the item's own build-report should get a second look (e.g. does it
+     reproduce in isolation?) before being reported as a live regression.
 
    **Under auto-pilot,** skip this ask too: auto-pick "rescan only the
    flagged items" (this skill's own stated recommendation), log it to
@@ -262,6 +288,15 @@ silent default.
 **Safety:** if `git` is unavailable in the target repo, treat all items as
 RESCAN-CANDIDATE and note it in the ask (don't silently skip verification).
 
+**Safety (shared-doc hit):** if Step 0.5's shared cross-team doc check found
+a hit this run, don't let the fingerprint re-check (step 5 above) downgrade
+any item to SKIP on the strength of its own local fingerprint alone — that
+fingerprint only re-extracts fields from the item's own artifacts, never
+from the shared doc that actually changed. Mark every item whose
+`decisions.md` or catalog references overlap the changed shared path as
+RESCAN-CANDIDATE outright and skip fingerprinting for those; say so
+plainly in the ask.
+
 ### Step 2 — Scan (parallel fan-out, one scanner per item)
 Launch one `status-scanner` **per item the Step 1.5 answer selected for
 scanning** in parallel (one message, multiple tool calls) — this is the
@@ -270,7 +305,20 @@ picked "force full rescan," or none at all if they picked "trust cache"
 (skip straight to Step 3 with every scratch file used as-is). Items not
 selected for scanning use their existing scratch file, passed directly to
 Step 3. Give each scanner: its item folder, the artifact inventory from
-triage, and the shared-memory paths. Each scanner
+triage, and the shared-memory paths.
+
+**Cap fan-out width against a shared, stateful dev/test stack.** If this
+project's items re-run tests against one shared dev/test stack (not a
+per-effort isolated one — check `PROJECT-CONTEXT.md`) and the scan set is
+large (double digits), launching every scanner in one batch risks the
+concurrent test runs contending with each other and producing transient
+failures that look like real regressions but aren't. Batch the launches
+instead — roughly 8-10 scanners per wave, next wave once the prior one
+returns — rather than firing the whole set in a single message. Skip this
+caution entirely when the project isolates each effort's own stack, or when
+the scan set is small.
+
+Each scanner
 does the load-bearing work — **read-only, but not passive:**
 - **Reconcile intent vs. state:** read `technical-plan.md` (what was
   intended) against `build-report.md` (what was last reported done/verified)
@@ -284,7 +332,11 @@ does the load-bearing work — **read-only, but not passive:**
 - **Open decisions:** scan `decisions.md` for any `PENDING` / `PARKED` item.
 - **Cross-item drift:** flag when a sibling item's plan/decisions were never
   updated to reflect a follow-on that touches the same surface, or when two
-  items edit the same file/section.
+  items edit the same file/section. Also list, plainly, any catalog ID
+  (`RI-00N`, `DEC-N`) this item's own docs cite by reference — you don't need
+  to chase whether the reference is reciprocated (that check runs once, at
+  synthesis, in `status-lead`), just surface which IDs are in play so the
+  lead doesn't have to re-derive them.
 - **Classify the stage** (one of): `not-started` · `intake-only` (plans, no
   tests) · `qa-done` (test-plan exists, not built) · `build-in-progress` ·
   `build-green` · `build-green-with-caveats` · `stale — report contradicted
@@ -315,36 +367,65 @@ does the load-bearing work — **read-only, but not passive:**
 
 ### Step 3 — Synthesize + report
 Run `status-lead` with the triage inventory + every scanner's scratch file.
-It writes `<target>/status-report.md` (from `templates/status-report.md`): a
-stage-map of every item with explicit **Intake / QA / Build / Merged**
-columns (never a single enum label — "merged" is always its own yes/no, not
-folded into a phrase like "build-green"), a **merged-item follow-up**
-breakdown for every item that IS merged (classified `NONE` / `COSMETIC` /
-`DOC CLEANUP` / `OPERATIONAL` / `DEPENDS-ON-ITEM` / `FUTURE SCOPING` — see
-the template), the reconciled true state, open `PENDING`/`PARKED` decisions,
-cross-item drift, a **parallelization opportunity** check (whether two or
+It writes `<target>/status-report.md` (from `templates/status-report.md`):
+**two** stage tables, in this order:
+1. **Stage-map** — every item that still has something outstanding, with
+   explicit **Intake / QA / Build / Merged** columns (never a single enum
+   label — "merged" is always its own yes/no, not folded into a phrase like
+   "build-green"). This table only ever holds items with real remaining
+   work, so it doubles as the to-do list.
+2. **Ready for Deployment** — every item that is all-four-✅
+   (Intake/QA/Build/Merged) **AND** whose merged-item follow-up type is
+   `NONE` (genuinely nothing left, not even a doc/operational/
+   future-scoping residual). The moment an item first qualifies, it moves
+   OUT of the Stage-map and INTO this table — it never appears in both.
+   Displayed **second**, after the Stage-map, so outstanding work is what a
+   reader sees first (see the template's "Ready for Deployment" convention).
+   **"Ready for Deployment" means code-complete and merged — it is NOT the
+   same fact as "released."** Whether a client has actually been told about
+   an item is `team-release`'s ledger (`team-release/memory/release-log.md`),
+   which this skill doesn't track or check. An item can sit in this table
+   indefinitely without a release ever being cut; that's expected, not a
+   status gap — see `team-release` for shipping it.
+
+Then a **merged-item follow-up** breakdown for every item that IS merged
+(classified `NONE` / `COSMETIC` / `DOC CLEANUP` / `OPERATIONAL` /
+`DEPENDS-ON-ITEM` / `FUTURE SCOPING` — see the template) — this is what
+determines which table an item belongs in. The reconciled true state, open
+`PENDING`/`PARKED` decisions, cross-item drift, a **parallelization
+opportunity** check (whether two or
 more ready-to-build items are independent enough to run as concurrent
 `team-build` worktree efforts, laid out as an Option A: concurrent / Option
 B: sequential trade-off — never a unilateral pick), and — the point of the
 whole skill — **the single recommended next action**: *which skill to invoke
-(`team-intake` / `team-qa` / `team-build`, or `librarian` if that plugin
-   is also installed), on which folder,
+(`team-intake` / `team-qa` / `team-build` / `librarian`), on which folder,
 and why*, citing the concrete gap. It also appends one row to the status
 run-log. Capture its headline recommendation and, if present, the
 parallelization choice verbatim.
 
 ### Step 4 — Report back
 Present the reconciled state **in chat as plain-text tables** (ASCII-style
-markdown tables render fine in chat — prefer them over a rendered
-UI/artifact page unless the user explicitly asks for one):
-- **A numbered stage-map table** — columns `#` · `Item` · `Intake` · `QA` ·
-  `Build` · `Merged` · `Notes`, using ✅ / ❌ / ➡️ per the template's legend.
-  This is the primary "where are we" answer — lead with it. Number the rows
-  so the user can say "run #3" to pick one without retyping its slug.
-  **Always print the legend directly under the table** — never assume the
-  icons are self-explanatory: `✅ done · ❌ not done / not applicable ·
-  ➡️ partially done (e.g. built but never committed/merged, deliberately
-  waived, or found incomplete)`.
+markdown tables render fine and are what the user has asked for — not a rendered
+UI/artifact page unless she explicitly asks for one):
+- **A numbered stage-map table, FIRST — items with outstanding work only** —
+  columns `#` · `Item` · `Intake` · `QA` · `Build` · `Merged` · `Notes`, using
+  ✅ / ❌ / ➡️ per the template's legend. This is the primary "where are we"
+  answer — lead with it. Number the rows so the user can say "run #3" to pick
+  one without retyping its slug. **Always print the legend directly under
+  the table** — never assume the icons are self-explanatory: `✅ done · ❌
+  not done / not applicable · ➡️ partially done (e.g. built but never
+  committed/merged, deliberately waived, or found incomplete)`. **Any item
+  that is all-four-✅ and whose Merged-item follow-up type is `NONE` does
+  NOT appear in this table** — it belongs in the Ready for Deployment table
+  below instead (this applies whether the split is freshly computed this run
+  or read back from a cached `status-report.md`). If every item qualifies
+  for Ready for Deployment, say so plainly instead of printing an empty
+  table.
+- **A "Ready for Deployment" table, SECOND** — columns `#` · `Item` ·
+  `Notes` (Notes reads exactly "Ready for deployment." for every row — all
+  four pipeline columns are implicitly ✅ by definition of being in this
+  table, so they aren't repeated). Holds every item moved out of the
+  stage-map above. Omit this table entirely if nothing currently qualifies.
 - **A merged-item follow-up table** — only for rows where Merged = ✅, columns
   `#` · `Item` · `Type` · `What's left`, using the fixed taxonomy (`NONE` /
   `COSMETIC` / `DOC CLEANUP` / `OPERATIONAL` / `DEPENDS-ON-ITEM` /
@@ -425,6 +506,43 @@ auto-pick **Option A** (already this skill's own presented-first default —
 fresh, self-contained kickoff lines, no subagent spawned), log it as
 `DECIDED-AUTO`, and print the kickoff lines directly instead of waiting.
 
+### Step 4.5 — Commit pipeline docs, and apply any proposed corrections (gate)
+This step runs at the **orchestrator level** — the main agent, using its own
+`git`/`Edit` access, same as Step 0.5's git checks already do. No subagent is
+involved and `status-lead`'s own tool grant/write-scope doesn't change.
+
+- **Skip entirely** if Step 0.5 took the fully-cached path (nothing new was
+  written this run) or `<target>`'s repo isn't a git working tree. Say so
+  plainly, don't fail.
+- **If `status-report.md` contains a non-empty "Proposed corrections"
+  section** (from `status-lead` — see its role file), gate on it before
+  touching anything:
+
+  🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧 — **PREFERENCE gate.**
+  Show each proposed correction (file · old text → new text · one-line why);
+  ask lettered — **A)** apply all · **B)** apply some · **C)** apply none.
+  On A/B, apply each approved edit with the file-edit tool against its real
+  target file — this may be a *third-party* doc this team doesn't normally
+  write to (`decision-log.md`, the defect catalog, a sibling item's own
+  `decisions.md`), which is exactly why it's gated and never auto-applied.
+  Never touch product code, a plan, or a test this way.
+- **Then make one local commit** covering `status-report.md`,
+  `.status-scratch/*`, the run-log row, and any corrections just applied —
+  stage by explicit path, never `git add -A` (a shared repo may have
+  unrelated in-flight work sitting in the same working tree). **Never
+  push** — pushing stays `wrap-up`'s job, not this skill's. Report the
+  commit hash in the chat reply; this must be visible, not silent.
+- If the commit can't land cleanly (a pre-commit hook rejects it, unrelated
+  dirty state blocks a clean stage), report the failure plainly and stop —
+  don't strip hooks, don't force it, don't fall back to `git add -A` to make
+  it work.
+- **Why this exists:** these are `status-report.md`/`.status-scratch/*`/the
+  run-log — artifacts this team exclusively owns, that carry zero product-code
+  risk. Leaving them uncommitted until a later `wrap-up` is exactly how a
+  status report can go stale relative to its *own* on-disk state (a ruling
+  gets made, the doc gets edited, and the edit itself sits unpropagated for
+  hours) — see "The recurring trap this skill exists to catch" below.
+
 ## Decision logging
 This is a read-only audit skill, so it rarely needs a decision from the
 user — but when it does (scope is genuinely ambiguous at Step 0; or a report
@@ -437,6 +555,15 @@ remembered. Two places:
 2. **Global:** the status-run-log row captures the run; note the decision
    there in one line.
 Write it `PENDING` before asking; flip to `DECIDED` / `PARKED` once answered.
+
+**Propagate the flip, don't just log it.** The moment a decision this run
+touches moves off `PENDING`/`PARKED` anywhere in the project, name every
+other doc that still cites the old status in the Step 4 report-back — a
+cached report, a sibling's `decisions.md`, the defect catalog. This team
+can't edit those on its own initiative (read-only outside Step 4.5), so the
+correction itself is exactly what belongs in Step 4.5's "Proposed
+corrections" gate — that's the tie-in between this rule and the
+reciprocal-cross-reference check `status-lead` runs during synthesis.
 
 ## Conventions
 - **Human gates must be visible, not just asked.** At every 🟧 HUMAN GATE
@@ -488,7 +615,11 @@ Write it `PENDING` before asking; flip to `DECIDED` / `PARKED` once answered.
 - **Read-only reconciler, single writer of its own artifacts.** Scanners and
   triage never write to any plan, test, product file, or another team's
   memory. Only `status-lead` writes, and only `status-report.md` + the
-  run-log.
+  run-log — it never touches a third-party doc itself. The one exception is
+  Step 4.5, which runs at the orchestrator level (not `status-lead`), only
+  ever on `status-lead`'s own explicitly-drafted "Proposed corrections," and
+  only after an explicit human gate — never a silent or automatic edit to
+  another team's file.
 - **Shared memory is INPUT, never forked.** Read (do not copy, do not edit)
   each team's own `memory/` folder to know what's already been done and
   which project-specific defect surfaces are in play. **One source of

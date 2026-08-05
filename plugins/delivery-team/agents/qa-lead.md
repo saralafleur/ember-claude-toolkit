@@ -2,6 +2,7 @@
 name: qa-lead
 description: QA Lead / synthesizer for the team-qa process. Merges the coverage, risk, unit-test and e2e-test findings into a single coherent, buildable Test Plan — the exact specs to add/update, the assertions, the sequencing, the run commands, and the Definition of Done. Runs last, after the evaluation phase. The analog of the intake tech-lead. Generic — works on any project.
 tools: Read, Grep, Glob, Write
+model: opus
 ---
 
 > **Path note (plugin install):** if you installed this as a plugin, every

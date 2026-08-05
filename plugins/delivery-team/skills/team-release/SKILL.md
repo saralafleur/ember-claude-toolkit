@@ -81,7 +81,15 @@ items.
   `PROJECT-CONTEXT.md`) unless the user names one.
 - Enumerate the **work items** in the release: each item's intake/build
   folder and its `build-report.md`. Confirm each item was actually built (a
-  green build-report), and gather the commit range per repo touched.
+  green build-report), and gather the commit range per repo touched. If a
+  recent `status-report.md` exists for this project (`team-status`'s output),
+  check its "Ready for Deployment" table first — those items have already
+  been independently re-verified as merged, so it's a faster starting point
+  than re-deriving the item list from scratch. Being in that table means
+  code-complete and merged, **not** already released — this skill still owns
+  deciding what's actually in the release and still fact-checks every
+  client-facing claim itself in Step 3. Fall back to enumerating each item's
+  `build-report.md` directly if no `status-report.md` exists.
 
 🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧 — **PREFERENCE gate.**
 - Do not invent scope. If it's unclear which items belong to this version,

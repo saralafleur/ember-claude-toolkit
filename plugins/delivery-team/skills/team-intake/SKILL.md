@@ -188,6 +188,16 @@ if the user defers it to a stakeholder) once they answer. The PM reads the
 decision-log during history reconstruction, so a question answered once
 stays answered.
 
+**Propagate the flip, don't just log it.** The moment an entry moves off
+`PENDING`/`PARKED`, grep the project for every other doc that cited its old
+status — a technical-plan's Risks/rollback section, a sibling item's own
+`decisions.md`, the defect catalog if configured, a cached
+`status-report.md` — and correct them in the same sitting. If a citing doc
+is out of this skill's write scope (product code, another team's memory) or
+genuinely unreachable this session, **name it explicitly in the Step 6
+report-back** instead of leaving it silently stale — that's what lets a
+later `team-status` pass close the loop.
+
 ## Conventions
 - **Human gates must be visible, not just asked.** At every 🟧 HUMAN GATE
   REQUIRED point, present the question as its own standalone callout in the

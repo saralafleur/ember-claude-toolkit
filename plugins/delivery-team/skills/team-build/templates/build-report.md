@@ -39,6 +39,12 @@ one configured) + one line>
   checkout>
 - **Docker stack** (if provisioned): <compose file, project name, port block>
 
+## Shipped commit
+- **Per repo:** <filled in after Step 8's commit — the resulting SHA, or
+  "not yet committed / stopped at green" if the user declined. This is what
+  `team-release`'s `release-lead` reads to verify what actually shipped,
+  instead of re-deriving it from raw git history.>
+
 ## Residual risk & back-out
 - **Watch:** <what could still be wrong; any deferred cure and its
   consequence>

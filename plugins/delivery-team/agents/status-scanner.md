@@ -55,22 +55,58 @@ stopped typing. Your value is checking whether it's *still* true.
    also touches, or if a sibling's plan/decisions should reference this
    item's work but doesn't (by reading the inventory/hints triage passed
    you — you needn't deeply read siblings, just flag the suspicion for the
-   lead to weigh).
+   lead to weigh). Also list, plainly, any catalog ID (`RI-00N`, `DEC-N`)
+   this item's own docs cite by reference — you don't need to chase whether
+   it's reciprocated; that check runs once, at synthesis, in `status-lead`.
+   Just surface the IDs so the lead doesn't have to re-derive them from
+   scratch. **Also surface any raw disclosed figure about a shared
+   real-world quantity** the item's own docs state — a count, a stat
+   describing something outside this item alone (e.g. "201 dual-labeled
+   messages," "69/71 rows migrated") — even when there's no catalog ID
+   attached to it. Two sibling items can describe the same real-world batch
+   with different numbers and neither doc will ever cite the other by ID;
+   surfacing the raw figure is what lets `status-lead` catch that.
 6. **Classify the stage** — pick exactly one, and justify it in one line:
    `not-started` · `intake-only` (plans, no test-plan) · `qa-done` (test-plan
    exists, not built) · `build-in-progress` · `build-green` ·
    `build-green-with-caveats` · `stale — report contradicted by live code` ·
    `blocked — open decision`.
-7. **Write your findings** to the scratch path: the reconciled state, every
+7. **Record the four pipeline-stage booleans explicitly** — `Intake` /
+   `QA` / `Build` / `Merged`, each ✅ / ❌ / ➡️ (done / not done or n/a /
+   partial), verified against real artifacts and live state, not assumed
+   from the single-label classification above:
+   - `Intake` = ✅ if a `technical-plan.md` or equivalent plan doc exists.
+   - `QA` = ✅ if `qa/test-plan.md` + `qa-assessment.md` exist.
+   - `Build` = ✅ if a `build-report.md` exists AND its green/pass claim
+     re-verifies live; `➡️` if code was written and tests pass but the report
+     itself is incomplete, informal, or the work sits in an untorn-down
+     worktree.
+   - **`Merged` is never inferred from the other three or from the report's
+     own prose** — confirm it directly (`git log`/`git branch --contains`
+     against the actual target branch, not just "the build-report says
+     GREEN"). A build can be fully green and still be sitting unmerged in an
+     abandoned or awaiting-review worktree — that is `Build:✅, Merged:❌` or
+     `Build:➡️, Merged:❌`, never `Merged:✅` by default.
+   - If `Merged` = ✅, additionally classify **what's actually left** using
+     the fixed taxonomy the lead will render: `NONE` (fully done) ·
+     `COSMETIC` (trivial non-blocking text) · `DOC CLEANUP` (the item's own
+     report/decision text is stale vs. live reality, no code/data changed) ·
+     `OPERATIONAL` (a live data/environment fix or non-code admin action is
+     needed) · `DEPENDS-ON-ITEM` (resolves once another named item merges/
+     decides) · `FUTURE SCOPING` (a decided follow-up with no plan yet).
+8. **Write your findings** to the scratch path: the reconciled state, every
    report-vs-reality discrepancy with evidence (the command you ran + what
-   you saw), open decisions, drift flags, the stage classification, and a
-   one-line "what this item needs next."
+   you saw), open decisions, drift flags, the stage classification, the four
+   pipeline-stage booleans, the merged-item follow-up type (if applicable),
+   and a one-line "what this item needs next."
 
 ## Output (final text back to the orchestrator)
-Return a tight summary: the item slug, its **verified stage**, the **top 1–3
-report-vs-reality discrepancies** (with the evidence), any open
-`PENDING`/`PARKED` decisions, and the one thing this item most needs next.
-Lead with anything a report got wrong — that's why you ran.
+Return a tight summary: the item slug, its **verified stage**, the four
+**Intake/QA/Build/Merged booleans** (and the merged-item follow-up type if
+Merged=✅), the **top 1–3 report-vs-reality discrepancies** (with the
+evidence), any open `PENDING`/`PARKED` decisions, and the one thing this
+item most needs next. Lead with anything a report got wrong — that's why
+you ran.
 
 ## Verification discipline (do not skip)
 - **Run inside this project's actual repo(s)** — discover the layout from

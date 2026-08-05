@@ -15,10 +15,14 @@
 
 ## Stage-map
 
-One row per work item, with the pipeline stage spelled out as explicit
-columns — not a single enum label — so "have we done intake," "are we ready
-to build," "are we in QA," and "is this merged" are each a direct yes/no,
-not something the reader has to infer from a phrase.
+One row per work item **that still has something outstanding** — with the
+pipeline stage spelled out as explicit columns — not a single enum label —
+so "have we done intake," "are we ready to build," "are we in QA," and "is
+this merged" are each a direct yes/no, not something the reader has to infer
+from a phrase. This table is deliberately filtered: **items that are fully
+done (see "Ready for Deployment" below) are removed from here once they
+qualify**, so what remains in this table is always the true to-do list, not
+diluted by finished work.
 
 | # | Item (slug) | Intake | QA | Build | Merged | Notes |
 |---|-------------|:------:|:--:|:-----:|:------:|-------|
@@ -29,6 +33,29 @@ not something the reader has to infer from a phrase.
 > found it incomplete). A `stale` or `contradicted-by-live-code` finding goes
 > in Notes, not as a 4th symbol — say plainly what the report claimed vs. what
 > the live check found.
+
+_(If every item now qualifies for Ready for Deployment, say so plainly here
+— "No items with outstanding work; everything is in Ready for Deployment
+below" — don't leave an empty table with no explanation.)_
+
+---
+
+## Ready for Deployment
+
+Items that have graduated out of the Stage-map above: all four columns
+(Intake/QA/Build/Merged) are ✅ **and** the Merged-item follow-up type
+(below) is `NONE` — genuinely nothing left, not even a doc/operational/
+future-scoping residual. **The moment an item first meets this bar, move its
+row here and remove it from the Stage-map** — don't leave it in both places.
+This table is deliberately displayed **second**, after the Stage-map, so the
+outstanding work is what a reader sees first.
+
+| # | Item (slug) | Notes |
+|---|-------------|-------|
+| <n> | <slug> | Ready for deployment. |
+
+_(Omit this whole section if no item currently qualifies — everything still
+has some open thread, so the Stage-map above is the complete picture.)_
 
 ---
 
@@ -113,8 +140,7 @@ build-ready items exist — state that plainly instead of forcing a choice.)_
 ## Recommended next action
 
 **→ Invoke `<team-intake | team-qa | team-build | librarian>` on
-`<exact folder path>`.** (`librarian` only applies if that plugin is
-installed alongside `delivery-team`.)
+`<exact folder path>`.**
 
 **Why:** <the specific gap that makes this the next step, citing the item and, if
 it closes a recurring issue, the RI-id.>
@@ -122,6 +148,23 @@ it closes a recurring issue, the RI-id.>
 ### Backlog (after the above), in order
 1. <skill> on <folder> — <why>
 2. …
+
+---
+
+## Proposed corrections
+
+> Specific, unambiguous, low-risk fixes surfaced during synthesis — a missing
+> one-line catalog backlink, a stale count or status already corrected
+> elsewhere in this same batch of docs. Draft only: `status-lead` never
+> applies these itself; they're gated and applied (or not) by the
+> orchestrator at Step 4.5.
+
+| # | File | Old text | New text | Why |
+|---|------|----------|----------|-----|
+| <n> | `<path>` | `<verbatim old text>` | `<verbatim new text>` | <one line> |
+
+_(Omit this whole section if nothing this precise turned up this run — don't
+manufacture a correction to fill it.)_
 
 ---
 

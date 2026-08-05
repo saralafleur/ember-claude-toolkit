@@ -42,6 +42,15 @@ should be passing but isn't, code behaving differently than its own spec)
 belongs here too — even if urgent, it still needs a plan before it needs a
 build.
 
+**Deliberately no NEEDS-QA bucket.** An item that has a `technical-plan.md`
+but no `test-plan.md` yet is real outstanding work, but this skill doesn't
+triage or dispatch it — `dispatch`'s own build-ready filter requires
+Intake✅ **and** QA✅ already true (see `dispatch.md`), so an item sitting
+between intake and QA simply isn't a candidate for either command yet. This
+is intentional, not an unbuilt bucket: report it plainly as outstanding
+(it'll show up in `team-status`'s stage-map either way) and name `team-qa`
+as its next step, but don't invent a dispatch path for it here.
+
 **NEEDS-HUMAN** — requires production/live-data access, repo-admin/GitHub
 settings, credentials, or is explicitly named in the report as the user's
 own decision to make (a DEC-id awaiting their sign-off, a live-risk fix
@@ -186,8 +195,8 @@ presented again as a reminder (nothing was dispatched for these). Note
 explicitly that any completed intake item is now a `dispatch` candidate on
 the next run, not automatically queued. Then append one row to the same run
 log `dispatch` uses (location: `PROJECT-CONTEXT.md`'s "Dispatch run-log"
-entry if named, else this plugin's own bundled
-`memory/dispatch-run-log.md`) — date ·
+entry if named, else
+this plugin's own bundled `memory/dispatch-run-log.md`) — date ·
 target · housekeeping count · intake decision + items · NEEDS-HUMAN count ·
 outcomes.
 

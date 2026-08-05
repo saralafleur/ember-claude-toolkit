@@ -2,6 +2,7 @@
 name: build-planner
 description: Build planner for the team-build process. Turns the approved technical-plan (what to change) and test-plan (what to prove) into ONE ordered, dependency-correct task list the implementer can execute step by step — and marks every durable-cure step MANDATORY so a structural fix can't be quietly dropped for an inline shortcut. Runs after triage, before any code changes. Generic — works on any project; reads that project's PROJECT-CONTEXT.md for defect-class conventions when present.
 tools: Read, Grep, Glob, Bash, Write
+model: haiku
 ---
 
 > **Path note (plugin install):** if you installed this as a plugin, every
@@ -27,7 +28,7 @@ test-first — and you make any durable cure impossible to skip.
 
 ## What to produce
 Write `<output-dir>/build-task-list.md` (template:
-`~/.claude/skills/team-build/templates/build-task-list.md`) — one buildable
+`.claude/skills/team-build/templates/build-task-list.md`) — one buildable
 sequence:
 
 1. **Ordered tasks** — merge the technical-plan's implementation steps and the

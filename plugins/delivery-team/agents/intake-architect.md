@@ -26,6 +26,17 @@ covering:
    configured) for whether it's been burned by this exact shape before.
 4. **Architectural risks** — what could break elsewhere, what invariants must
    hold, migration/data concerns, security/trust boundaries if relevant.
+   Trust the Engineer's live-verified mechanism findings over assumption; if
+   you assert a third-party/external mechanism claim yourself, hold it to
+   the same bar — verify it against a live, authoritative source, don't
+   assert it from memory or an existing doc.
+   **Any scope boundary you're knowingly not addressing now must not live as
+   prose alone** — if you name something deliberately out of scope this
+   round, say explicitly in your returned summary that it needs a
+   `decisions.md` PENDING/WATCH row (or a defect-catalog stub, if this
+   project has one configured), not just a sentence here that nobody
+   re-reads. A disclosed-but-untracked exclusion is functionally identical
+   to an undiscovered one once enough time passes.
 5. **Recommended approach** — your pick, and why.
 
 ## Grounding

@@ -3,12 +3,11 @@ name: devops
 argument-hint: "[{{command}} | status]"
 description: >
   {{PROJECT}}'s DevOps toolbox — commands for setting up and verifying this
-  project's build environments. Use when the user types "/devops", or asks to
-  set up, check, or repair a build environment for {{PROJECT}}. Current
-  commands: `{{command}}` — {{one-line command summary}}; `status` —
-  read-only report of the current state of everything the devops skill
-  manages. Invoking with no command lists available commands and runs the
-  status report.
+  project's build environments. Use when the user types "/devops", or asks to set
+  up, check, or repair a build environment for {{PROJECT}}. Current commands:
+  `{{command}}` — {{one-line command summary}}; `status` — read-only report
+  of the current state of everything the devops skill manages. Invoking with
+  no command lists available commands and runs the status report.
 ---
 
 # DevOps Skill — {{PROJECT}}
@@ -28,6 +27,30 @@ same discipline:
 Never install anything before showing the audit and plan. All installs must be
 idempotent — re-running a command on a healthy environment should report
 "already set up" and change nothing.
+
+## Human gates
+
+**Every human decision** uses the delivery-team visible gate. Do not bury a
+choice in a narrative paragraph.
+
+At every stop-and-wait point, include the literal banner in the chat reply
+and present the question as its own callout:
+
+> 🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
+>
+> **Human decision needed:** <the question>
+
+Rules:
+
+- Never fold a gate into a summary where it reads as background.
+- Multiple gates in one report-back → each gets its own banner + callout.
+- Multi-way choices in plain chat: letter them `**A)**` / `**B)**` / `**C)**`
+  (plain yes/no "proceed?" does not need lettering).
+- Wait for the answer before execute / install / delete.
+
+Typical gates: large downloads, `/devops remove`, purge-data asks, deploy
+or other cloud-mutating executes. Mark each in the procedure docs with
+`🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧` above the decision.
 
 ## Command routing
 

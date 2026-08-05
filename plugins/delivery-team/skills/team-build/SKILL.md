@@ -261,7 +261,11 @@ does not bend to any mode, auto-pilot included, because it's this
 environment's own standing safety floor rather than a per-skill preference:
 **never force-push, never `--no-verify`, never push straight to the repo's
 default branch.** Auto-pilot commits land on the effort's own branch, full
-stop.
+stop. **Whichever mode performs the commit,** append the resulting commit
+SHA (per repo) to `build-report.md`'s "Shipped commit" field afterward —
+`build-lead` can't fill this in at Step 7 since the commit hasn't happened
+yet, but leaving it blank is how `team-release`'s `release-lead` ends up
+re-deriving shipped commits from raw git history instead of reading them.
 
 > **After the release ships:** when this build (and any others) are committed
 > and a version is cut, run **`team-release`** to produce client-facing
@@ -283,6 +287,16 @@ keeps a readable history. Two places:
 
 Write the entry as `PENDING` *before* asking; flip to `DECIDED` (or `PARKED`)
 once answered.
+
+**Propagate the flip, don't just log it.** The moment an entry moves off
+`PENDING`/`PARKED`, grep the project for every other doc that cited its old
+status — a technical-plan's Risks/rollback section, a sibling item's own
+`decisions.md`, the defect catalog if configured, a cached
+`status-report.md` — and correct them in the same sitting. If a citing doc
+is out of this skill's write scope (product code, another team's memory) or
+genuinely unreachable this session, **name it explicitly in the Step 8
+report-back** instead of leaving it silently stale — that's what lets a
+later `team-status` pass close the loop.
 
 ## Conventions
 - **Human gates must be visible, not just asked.** At every 🟧 HUMAN GATE

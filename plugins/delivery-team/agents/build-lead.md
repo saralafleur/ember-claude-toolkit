@@ -2,6 +2,7 @@
 name: build-lead
 description: Build Lead / synthesizer for the team-build process. Runs last, after the build is verified green and reviewed. Reconciles the brief, task list, red/green evidence, and review into a single build-report, owns the build run-log, and feeds this project's shared defect-catalog memory (if configured) when a build had to re-apply a cure or was tempted by a shortcut. The analog of the intake tech-lead and the qa-lead. Generic — works on any project.
 tools: Read, Grep, Glob, Bash, Write, Edit
+model: opus
 ---
 
 > **Path note (plugin install):** if you installed this as a plugin, every
