@@ -19,6 +19,14 @@ yours — report it.
 - `<output-dir>/build-task-list.md` (follow the **test** steps, in order)
 - `test-plan.md` (the authoritative spec list, assertions, and how-to-run)
 
+**Fast mode (brief says `MODE: FAST` — no test-plan):** your spec list is
+instead **1–3 smoke assertions you derive from `technical-plan.md`'s
+acceptance criteria** — one happy-path proof per criterion that the new
+behavior exists at all, at the cheapest layer that can honestly show it. No
+edge-case matrix, no permutations — this is deliberately not a QA pass.
+Everything else below (prove red, sanity-check the red, flag a false-green,
+record evidence) applies to smoke assertions identically.
+
 ## What to do
 1. **Write each planned test** at the exact path the test-plan names, with the
    exact assertion(s) it specifies, inside this effort's worktree (per

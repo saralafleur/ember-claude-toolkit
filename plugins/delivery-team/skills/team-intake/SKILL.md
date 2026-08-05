@@ -1,7 +1,7 @@
 ---
 name: team-intake
 description: 'Run a virtual delivery team (triage, product owner, architect, engineer, QA, project manager, tech lead) over an incoming client request — on any project. Use when: a new feature/bug/change request comes in and needs to be understood, classified, and turned into a plan before any code is written; you have a file or folder describing what a client wants; you want intake/triage of a request; you need a technical plan AND a project-manager plan; or you want to know "have we seen this request before?" before acting. Produces a technical plan and a PM plan per request and remembers recurring issues (when the project has a defect catalog configured) so the team stops going in circles.'
-argument-hint: '[<path> | auto|auto-pilot [direct] <path> | direct [auto] <path>] — path to the intake base folder (holds the request; an `intake/` subfolder is created inside it for the plans). Optional — will ask if omitted. See "Run modes" for the auto-pilot/direct tokens.'
+argument-hint: '[<path> | auto|auto-pilot [direct] <path> | direct [auto] <path> | fast <path>] — path to the intake base folder (holds the request; an `intake/` subfolder is created inside it for the plans). Optional — will ask if omitted. See "Run modes" for the auto-pilot/direct/fast tokens.'
 ---
 
 # Team Intake
@@ -61,6 +61,7 @@ change that, and compose in either order (`auto direct <path>` /
 |---|---|---|
 | Auto-pilot | `auto-pilot`, alias `auto` | Every gate in "Process" is tagged **PREFERENCE**, **QUALITY**, or **required-input**. PREFERENCE gates no longer stop — the team decides on its own best recommendation, logs the choice to `decisions.md` as `DECIDED-AUTO`, and keeps going. QUALITY gates (an actually-`BLOCKED` verdict) still stop, in every mode — there's no recommendation to make when the request itself isn't understood. |
 | Direct | `direct` | Right after Step 2's triage returns `READY`, run `director-of-engineering` with this skill's own roster (the table above) instead of the fixed Step 3 fan-out; execute exactly the agents/order it returns in place of Steps 3–5. |
+| Fast | `fast` | **Implies `auto` + `direct`**, plus a speed bias: get something working with the direction still checked, QA deferred. Tell the director this run is **fast** — its roster default inverts to *skip unless load-bearing for direction* (product-owner/architect/tech-lead lean toward kept, `intake-qa` toward skipped; a defect-catalog match still forces the guardrail back on). At Step 6, the auto-decision becomes **"proceed straight to `team-build fast`"** — skipping the `team-qa` stage entirely — logged as `DECIDED-AUTO` with the deferred-QA trade-off named. QUALITY and required-input gates still stop, like every mode. |
 
 Both modes still write every artifact this skill normally writes, to the same
 paths — `direct` just produces fewer `supporting/*.md` files (only for the
@@ -75,9 +76,9 @@ materials *and* is where the plans get written (under an `intake/`
 subfolder).
 
 - Parse the skill argument for a leading mode token first — `auto`/
-  `auto-pilot` and/or `direct`, in either order, before the path (see "Run
-  modes" above). Strip whatever mode tokens are present; whatever remains is
-  the folder.
+  `auto-pilot`, `direct`, and/or `fast` (which implies both), in any order,
+  before the path (see "Run modes" above). Strip whatever mode tokens are
+  present; whatever remains is the folder.
 - If the user gave a folder path (as the skill argument or in the message),
   use it as the intake base folder. The request materials (ticket, email,
   doc, screenshots) live in this folder. (If they pointed at a single file
@@ -101,11 +102,12 @@ subfolder).
 Run `intake-triage` on the source → it writes `request-brief.md` and returns
 a `READY` / `BLOCKED` verdict.
 
-**If `direct` was requested:** once triage returns `READY`, run
-`director-of-engineering` now with this skill's own roster (the table under
-"The team") instead of the fixed Step 3 fan-out below — it writes
+**If `direct` was requested (including via `fast`):** once triage returns
+`READY`, run `director-of-engineering` now with this skill's own roster (the
+table under "The team") instead of the fixed Step 3 fan-out below — it writes
 `run-plan.md`; execute exactly the agents/order it returns in place of
-Steps 3–5.
+Steps 3–5. **If the run is `fast`, say so in the director's prompt** — its
+keep/skip default inverts (see its "Fast mode" section).
 
 🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧 — **QUALITY gate, stays in every mode,
 including auto-pilot.**
@@ -157,7 +159,11 @@ Then ask whether to proceed to implementation (out of scope for this skill).
 **Under auto-pilot,** skip the ask: default to "yes, proceed to `team-qa`
 next" (unblocking the next stage is this skill's whole purpose), log it to
 `decisions.md` as `DECIDED-AUTO`, and say so plainly in the summary above
-instead of waiting.
+instead of waiting. **Under fast,** the auto-decision is instead "proceed
+straight to `team-build fast`" — the `team-qa` stage is deliberately
+skipped; log the `DECIDED-AUTO` entry naming the trade-off (QA deferred,
+build will carry a `FAST — QA debt` stamp so a later `team-status` pass
+recommends the follow-up `team-qa` run).
 
 ### Step 7 — Client approval sheet (optional, on demand)
 When sign-off items need to go to a non-technical client, run

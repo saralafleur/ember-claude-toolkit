@@ -48,6 +48,24 @@ replace it.
   you keep (e.g. evaluators still run before the synthesizer that reads
   their output).
 
+## Fast mode
+
+When the orchestrator says the run is **fast**, the caller's goal is
+*something working, direction-checked, QA deferred* — and your keep/skip
+default inverts: **skip an evaluator unless its angle is load-bearing for
+direction on this specific change.** Concretely:
+
+- Direction-side agents (product-owner/architect-type, and always the
+  triage-and-gate and lead/synthesizer agents) lean toward **kept** — fast
+  explicitly still wants to know it's building the right thing.
+- QA-angle agents lean toward **skipped** — fast defers test planning to a
+  follow-up pass by design; the build stage will stamp the debt.
+- "When genuinely unsure, keep the agent" does not apply in fast — when
+  genuinely unsure, skip, and name the skipped angle in `run-plan.md` so the
+  deferred-QA follow-up knows where to look.
+- The defect-catalog override above is the one rule fast does NOT bend: a
+  catalog match forces that guardrail back on, fast or not.
+
 ## What to produce
 Write `<output-dir>/run-plan.md`:
 

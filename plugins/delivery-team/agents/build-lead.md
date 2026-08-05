@@ -31,6 +31,14 @@ build doesn't repeat this one's mistakes.
 Write `<output-dir>/build-report.md` (template:
 `~/.claude/skills/team-build/templates/build-report.md`) — the document the
 user reads:
+
+**Fast mode (brief says `MODE: FAST`):** the report's header carries a
+**`FAST — QA debt`** stamp, above everything else, listing exactly what was
+deferred: no test-plan, smoke-only coverage (name the smoke assertions), and
+every full-DoD item the verifier recorded as DEFERRED. End the stamp with the
+recommended follow-up: *run `team-qa` on this intake folder, then a follow-up
+build for the tests it plans.* A later `team-status` pass reads this stamp to
+recommend that follow-up — never present a fast build as fully verified.
 1. **What was built** — one paragraph, plain language: the end state now in
    the tree.
 2. **Change verdict** — `GREEN` / `GREEN-WITH-CAVEATS` / `BLOCKED` (from the

@@ -1,7 +1,7 @@
 ---
 name: team-build
 description: 'Run a virtual engineering team (build-triage, build-planner, test-author, implementer, verifier, reviewer, build-lead) over an approved plan to actually BUILD it — on any project. Use when: a team-intake technical-plan and a team-qa test-plan exist and the work now needs to be implemented; you want code written test-first and proven red→green before it is declared done; you have an approved change to build and want it built without re-litigating the design; or a project has its own recurring-defect catalog and you want any durable structural cure actually applied instead of an inline shortcut. Produces a reviewable green diff in an isolated per-effort git worktree plus a build-report, and remembers when a build re-takes a shortcut so the team stops shipping the same regression — when the project has a defect catalog configured to remember it in.'
-argument-hint: '[<path> | auto|auto-pilot [direct] <path> | direct [auto] <path>] — path to the completed intake folder (the one holding intake/.../technical-plan.md and qa/.../test-plan.md). A build/ subfolder is created inside it for the build artifacts. Optional — will ask if omitted. See "Run modes" for the auto-pilot/direct tokens.'
+argument-hint: '[<path> | auto|auto-pilot [direct] <path> | direct [auto] <path> | fast <path>] — path to the completed intake folder (holding intake/.../technical-plan.md and, except under fast, qa/.../test-plan.md). A build/ subfolder is created inside it for the build artifacts. Optional — will ask if omitted. See "Run modes" for the auto-pilot/direct/fast tokens.'
 ---
 
 # Team Build
@@ -86,6 +86,7 @@ optional modes change that, and compose in either order
 |---|---|---|
 | Auto-pilot | `auto-pilot`, alias `auto` | Every gate in "Process" is tagged **PREFERENCE**, **QUALITY**, or **SHIP**. PREFERENCE gates no longer stop — the team decides on its own best recommendation, logs the choice to `decisions.md` as `DECIDED-AUTO`, and keeps going. QUALITY gates (a `BLOCKED` verdict from a missing/incomplete plan, a red test that's already green, a fix loop that didn't converge) still stop, in every mode — there's no recommendation to make when the premise is broken. **SHIP gates proceed too under auto-pilot** (Step 8): commit + push land on this effort's own isolated branch, and open a PR if this project has that convention. What never changes, in any mode — this environment's own standing safety floor, not a skill preference: no force-push, no `--no-verify`, no push straight to the repo's default branch. |
 | Direct | `direct` | Right after Step 1's `build-triage` returns `READY`, run `director-of-engineering` with this skill's own roster (the table under "The team"). **Build's red-first TDD core is structural, not discretionary** — `build-test-author` (Step 3), `build-implementer` (Step 4), and `build-verifier` (Step 5) always run; direct mode's real discretion here is over `build-planner` (Step 2 — foldable for a single obviously-ordered task) and `build-reviewer` (Step 6 — skippable only for a small, low-risk diff, unless a defect-catalog match forces it back on). `build-triage` and `build-lead` always run regardless. |
+| Fast | `fast` | **Implies `auto` + `direct`**, plus a degraded-verification contract for building from a `technical-plan.md` alone — no `test-plan.md` required and no `team-qa` detour (Step 0's ask is skipped; the missing test-plan is logged `DECIDED-AUTO` as a named trade-off). The red-first core survives at **smoke level**: `build-test-author` derives **1–3 smoke assertions from the technical-plan's acceptance criteria** (not from a test-plan) and proves them red; the implementer makes them green; `build-verifier` runs a **fast DoD** — existing suites still green, smoke proof red→green, the thing actually runs. `build-reviewer` follows direct-mode discretion. The build-report and Step 8 summary carry a **`FAST — QA debt`** stamp listing what was deferred, so a later `team-status` pass recommends the follow-up `team-qa` run instead of the gap disappearing. QUALITY gates (BLOCKED triage, a smoke test that's already green, a non-converging fix loop) still stop; a **defect-catalog match still forces the full guardrail** for that concern, fast or not. Ship gate behaves as auto-pilot (commit + push on the effort's own branch). |
 
 Both modes still write every artifact this skill normally writes, to the same
 paths — `direct` just produces a thinner `run-plan.md`-guided pass (fewer of
@@ -99,12 +100,13 @@ team-build needs **the technical-plan** (what to build) and **the test-plan**
 (what to prove). Both normally live inside a completed intake folder:
 
 - Parse the skill argument for a leading mode token first — `auto`/
-  `auto-pilot` and/or `direct`, in either order, before the path (see "Run
-  modes" above). Strip whatever mode tokens are present; whatever remains is
-  the path.
+  `auto-pilot`, `direct`, and/or `fast` (which implies both), in any order,
+  before the path (see "Run modes" above). Strip whatever mode tokens are
+  present; whatever remains is the path.
 - If the user gave a path to a completed intake folder, use it. The plans are
   at `<intake-dir>/intake/.../technical-plan.md` and
-  `<intake-dir>/qa/.../test-plan.md` (or directly inside it). Locate both.
+  `<intake-dir>/qa/.../test-plan.md` (or directly inside it). Locate both —
+  **under `fast`, only the technical-plan is required.**
 
 🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧 — **required-input, unaffected by any mode.**
 - **If nothing was given, STOP and ask:** "Point me at the completed intake
@@ -119,6 +121,10 @@ team-build needs **the technical-plan** (what to build) and **the test-plan**
   build blind. **Under auto-pilot,** skip the ask: default to "yes, run
   `team-qa` first" (this skill's own rule is never build blind — that's the
   best recommendation there is), log it to `decisions.md` as `DECIDED-AUTO`.
+  **Under `fast`, the default flips:** proceed with the technical-plan alone —
+  no `team-qa` detour — and log the missing test-plan to `decisions.md` as
+  `DECIDED-AUTO` naming the trade-off (smoke-level verification only; QA
+  deferred; the build-report will carry the `FAST — QA debt` stamp).
 - Do not invent a plan or a location.
 
 **Output location:** write under `<intake-dir>/build/<YYYY-MM-DD>-<slug>/`
@@ -193,6 +199,14 @@ them, and **proves each one RED** against the current (unbuilt) code in this
 effort's worktree, recording the exact failing output. It changes test files
 only — **no product code**.
 
+**Under `fast` (no test-plan):** the test-author instead derives **1–3 smoke
+assertions from the technical-plan's acceptance criteria** — the minimum
+proof that the new behavior exists at all (one happy-path per acceptance
+criterion, no edge-case matrix) — and proves those red the same way. This is
+deliberately not a QA pass; it exists so the build can still prove it
+changed something. The red-that-comes-up-green gate below applies to smoke
+tests identically.
+
 🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧 — **QUALITY gate, stays in every mode,
 including auto-pilot.**
 - If a test that should be red passes green already, that's a signal the plan
@@ -216,6 +230,14 @@ the project has one and the plan's scope needs it), runs the **full relevant
 suites**, confirms **each new test went red→green**, and runs the Definition
 of Done from the plans plus any standing guards this project's defect catalog
 calls for. It records the green evidence.
+
+**Under `fast`, the DoD is the fast DoD:** existing suites still green, every
+smoke assertion proven red→green, and the built thing demonstrably runs
+(app boots / endpoint answers / command exits clean — whatever the
+technical-plan's surface implies). Defect-catalog standing guards still run —
+fast never skips a guard the project already paid to learn. Everything else
+in the plans' full DoD is recorded as **deferred**, not silently dropped —
+the list feeds the `FAST — QA debt` stamp.
 
 🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧 — **QUALITY gate, stays in every mode,
 including auto-pilot.**
@@ -250,6 +272,13 @@ Summarize for the user in chat:
 - Links to `build-report.md`, `build-task-list.md`, and `decisions.md`.
 - **Under auto-pilot:** also list every `DECIDED-AUTO` entry from this run —
   "Decided automatically (auto-pilot): N items — see decisions.md."
+- **Under `fast`:** lead with the **`FAST — QA debt`** stamp — it goes in
+  both this summary and `build-report.md`'s header — listing exactly what
+  was deferred (no test-plan, smoke-only coverage, the full-DoD items the
+  verifier recorded as deferred) and the recommended follow-up: "run
+  `team-qa` on this intake folder, then a follow-up build for the tests it
+  plans." A later `team-status` pass reads this stamp to recommend that
+  follow-up; never present a fast build as fully verified.
 
 🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧 — **SHIP gate.** In standard mode, **stop**
 — do not commit, push, or open a PR. Ask whether the user wants to commit or

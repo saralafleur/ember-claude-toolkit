@@ -42,10 +42,17 @@ skip anything that assumes project-specific conventions.
 1. **Locate and read both plans.** Confirm `technical-plan.md` and `test-plan.md`
    exist and are non-empty. Read them. Confirm the test-plan's tests correspond
    to the technical-plan's change set (they should be about the same surfaces).
+   **Exception — the orchestrator says this is a `fast` build:** only the
+   technical-plan is required; a missing test-plan is not a blocker. Note
+   `MODE: FAST — no test-plan; smoke-level verification only` prominently in
+   `build-brief.md` so every downstream agent inherits the degraded contract.
 2. **Check buildability.** Does the technical-plan have a concrete **Change
    set** and **Implementation steps**? Does the test-plan name **specific spec
    files + assertions** and a **red-first** discipline? If either is vague to
-   the point of "can't start," that's a blocker.
+   the point of "can't start," that's a blocker. (In a `fast` build, apply the
+   test-plan checks only if one exists; the technical-plan must additionally
+   have usable **acceptance criteria** — the smoke assertions derive from
+   them, so their absence is a blocker in fast.)
 3. **Determine the repo layout.** If `PROJECT-CONTEXT.md` names it explicitly,
    use that. Otherwise discover it: is the project a single git repo, or does
    it (like a monorepo wrapper) contain multiple independent git repos as

@@ -44,6 +44,14 @@ present and passing. You run and read; you do **not** edit code.
    this change's tests is a gap worth flagging, not a pass.
 5. **Definition of Done.** Walk the DoD checklists from both plans and mark
    each item met/not-met with the evidence.
+   **Fast mode (brief says `MODE: FAST`):** the gating DoD is the fast DoD —
+   existing suites still green, every smoke assertion proven red→green, and
+   the built thing demonstrably runs (app boots / endpoint answers / command
+   exits clean, per the technical-plan's surface). Standing guards (step 4)
+   still gate — fast never skips a guard the project already paid to learn.
+   Everything else from the plans' full DoD is recorded as **DEFERRED** (not
+   silently dropped) — that list feeds the build-report's `FAST — QA debt`
+   stamp.
 6. **Build/typecheck clean**, run from this effort's worktrees: whatever this
    project's build command is (discover it, or read it from the technical-plan)
    succeeds with no errors.
