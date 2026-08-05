@@ -97,9 +97,18 @@ node scripts/install.mjs antigravity --all
 
 **Antigravity note:** its CLI can also import an already-installed Gemini CLI extension directly, so `node scripts/install.mjs gemini <plugin>` followed by Antigravity's own import command is a valid alternative path if you'd rather not run the script's `antigravity` target.
 
+## Working model (author's machine)
+
+This repo is the **packaged distribution**, not the working set. On Sara's machine:
+
+- **Daily use and day-to-day edits** happen in the standalone install — real copies at `~/.claude/skills/<skill>/` and `~/.claude/agents/<agent>.md`. Edits there are live next session, no publish needed.
+- **This repo lags behind on purpose** until a release: `python3 scripts/sync-from-local.py` imports the standalone content and re-applies the distribution transforms (experimental banner, sanitized wording, plugin path notes, bash portability; `memory/` ships empty). It refuses to pass if a personal reference survives.
+- The repo is **not** registered as a live local marketplace — the standalone copies are the only live roster, so nothing double-loads. (The old `@skills-dir` symlink mechanism is retired.)
+- `librarian`, `product-analyst`, and `story-map` diverge from `~/.claude` by design (heavier path-relativization); sync those by hand when their behavior changes.
+
 ## Publishing changes
 
-After editing anything under `plugins/<name>/`, run `/refresh-plugins` from this repo — it runs the `/sanitize-plugins` privacy/IP/secrets gate, validates the changed plugin(s) and `marketplace.json`, bumps semver, commits, tags, and pushes.
+After the sync (or after editing anything under `plugins/<name>/` directly), run `/refresh-plugins` from this repo — it runs `scripts/sync-from-local.py` first, then the `/sanitize-plugins` privacy/IP/secrets gate, validates the changed plugin(s) and `marketplace.json`, bumps semver, commits, tags, and pushes.
 
 ## Wait, so does editing this repo update everyone instantly?
 
@@ -107,7 +116,7 @@ After editing anything under `plugins/<name>/`, run `/refresh-plugins` from this
 
 ### Picture two people looking at the same pot of soup
 
-- **You, the author**, register this repo as a `directory`-source marketplace (`/plugin marketplace add /path/to/ember-claude-toolkit`). Your working copy of the repo *is* the pot on the stove. Stir it — edit a file, save it — and the next `/reload-plugins` (or session restart), everyone eating from that install tastes the change. No copy sits in between.
+- **An author who registers this repo as a `directory`-source marketplace** (`/plugin marketplace add /path/to/ember-claude-toolkit`) — their working copy of the repo *is* the pot on the stove. Stir it — edit a file, save it — and the next `/reload-plugins` (or session restart), everyone eating from that install tastes the change. No copy sits in between. (Sara's own machine deliberately does **not** do this — see "Working model" above; her live roster is the standalone `~/.claude` install, and this repo stays a publish-only artifact.)
 - **Someone who installs from GitHub** (`/plugin marketplace add saralafleur/ember-claude-toolkit`) gets a sealed jar instead. `/plugin install` clones the plugin's code *at that moment* into their own `~/.claude/plugins/cache/...`, pinned to a specific version. You can keep stirring your pot all day long — their jar doesn't change until they go get a new one.
 
 So: **your own edits are live immediately for you.** They reach anyone else only once you publish a new version *and* they pull it.

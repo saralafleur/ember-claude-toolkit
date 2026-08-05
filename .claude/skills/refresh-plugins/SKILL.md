@@ -13,16 +13,32 @@ description: >
 # refresh-plugins
 
 Publishes edits made under `plugins/<name>/` in this repo. This is the
-**publish** step, not the **use** step — Sara's own daily use of a plugin
-comes from a live symlink at `~/.claude/skills/<name>` pointing straight at
-`plugins/<name>` in this repo (the `@skills-dir` mechanism), so her own edits
-are already active next session with no refresh needed. This skill exists for
-the two cases where a refresh genuinely matters:
+**publish** step, not the **use** step — Sara's daily use runs from the
+standalone install at `~/.claude/skills/<skill>` + `~/.claude/agents/<agent>.md`
+(real copies, not symlinks; the old `@skills-dir` symlink mechanism is
+retired). Day-to-day edits land there and are live immediately; this repo is
+the packaged distribution that lags behind until a sync runs.
+
+**Step 0 — import from the live install first.** Before anything else, run:
+
+```
+python3 scripts/sync-from-local.py
+```
+
+It copies the standalone skills/agents into `plugins/` and re-applies the
+distribution transforms (experimental banner, sanitized wording, plugin
+path notes, plugin-relative paths for engineering-manager, bash portability,
+memory/ never synced). It fails loudly if a personal reference survives.
+Review `git diff` after it runs — the diff is the release content. Plugins
+it lists as manual-sync (librarian, product-analyst, story-map) diverge from
+`~/.claude` by design and are synced by hand when their behavior changes.
+
+This skill exists for the cases where a refresh genuinely matters:
 
 - **Anyone consuming a plugin through the marketplace-install path** (a
   teammate, a second machine, or Sara testing the install path herself)
-  instead of the skills-dir symlink — they only see a new version after this
-  publish cycle runs and they update.
+  instead of the standalone `~/.claude` install — they only see a new version
+  after this publish cycle runs and they update.
 - **Keeping the repo itself correct** — manifest validation, version
   discipline, and marketplace.json staying in sync with what's actually in
   `plugins/`.
@@ -99,9 +115,11 @@ If this is a **new plugin folder** (not yet listed in
 Re-run `claude plugin validate .` after any marketplace.json edit.
 
 Also remind Sara (don't do this automatically — it touches her live
-environment): a brand-new plugin needs a live symlink for her own use —
-`ln -s "$(pwd)/plugins/<plugin-name>" ~/.claude/skills/<plugin-name>` — so it
-loads as `<plugin-name>@skills-dir` next session.
+environment): a brand-new plugin's skills/agents should be copied into the
+standalone install (`~/.claude/skills/<skill>/`, `~/.claude/agents/<agent>.md`)
+for her own daily use — the standalone install is the working set, and
+`scripts/sync-from-local.py` needs its `SKILL_MAP`/`AGENT_MAP` extended to
+cover the new plugin so future syncs pick it up.
 
 ## 4. Commit and tag
 
@@ -129,7 +147,7 @@ git push origin "<plugin-name>--v<version>"
 
 ## 6. Refresh installed copies
 
-For any marketplace-install (not skills-dir) consumer of this repo,
+For any marketplace-install (not standalone ~/.claude) consumer of this repo,
 including Sara's own local test install of `ember-toolkit`:
 
 ```

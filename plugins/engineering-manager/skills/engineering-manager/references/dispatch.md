@@ -212,8 +212,8 @@ One summary: the decision made (grouping + why), each item's outcome
 (merged / still open / failed), any BLOCKED questions that came up and how
 they were answered, and the merge commits. Then append one line to the run
 log (location: `PROJECT-CONTEXT.md`'s "Dispatch run-log" entry if this
-project names one, else this plugin's own bundled
-`memory/dispatch-run-log.md` — create from `templates/run-log-header.md` if
-it doesn't exist yet): date · target ·
+project names one, else
+this plugin's own bundled `memory/dispatch-run-log.md` — create
+from `templates/run-log-header.md` if it doesn't exist yet): date · target ·
 items dispatched · decision (parallel/sequential/single + one-line why) ·
 outcomes · merge commits.

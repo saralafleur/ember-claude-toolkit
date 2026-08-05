@@ -26,8 +26,15 @@ sizes. Template:
 |---|---|---|
 | {{Install X}} | {{~N GB download, ~N min}} | {{Yes — account/sudo / No}} |
 
-Check disk space against the largest install. Confirm with the user before
-starting any large download.
+Check disk space against the largest install. Before starting any large
+download, stop on a human gate:
+
+🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
+
+> 🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
+>
+> **Human decision needed:** Proceed with the plan above (including any
+> large downloads)? (yes / no)
 
 ## Phase 3 — Install
 
@@ -36,8 +43,8 @@ Only run the steps the audit flagged. Every step is idempotent.
 ### 3.1 {{Step name}} (if `{{audit-key}}` MISSING)
 
 {{Commands. Non-interactive → run directly, long ones in the background.
-Interactive (sudo, account login) → give the user the `!`-prefixed command
-and wait; never script around a login.}}
+Interactive (sudo, account login) → give the user the `!`-prefixed command and
+wait; never script around a login.}}
 
 ## Phase 4 — Verify (smoke test)
 

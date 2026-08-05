@@ -78,9 +78,19 @@ build-artifact row is unchanged.
 
 ## remove \<solution|all\>
 
-**DESTRUCTIVE.** Deletes the solution's build artifact(s) — image(s)/named-
-volume caches, or the venv/downloaded binary for a native solution. Not
-cheaply reversible for anything pulled/downloaded rather than built
+**DESTRUCTIVE.** Wipes the solution's **local build artifacts** so a prior
+`build`/`up` leaves nothing behind on this machine.
+
+- **Docker Compose:** remove containers (running or stopped), the compose
+  project network(s), and images built for this solution — e.g.
+  `docker compose down --rmi local` (add `-v` only when the plan includes
+  named/anonymous volumes owned by the project). Do **not** delete other
+  compose projects' resources, and do **not** delete remote registry
+  images (ECR / Docker Hub) from this command.
+- **Native:** delete the venv / downloaded binary / build output that
+  `build` created.
+
+Not cheaply reversible for anything pulled/downloaded rather than built
 locally.
 
 **If any solution persists real data outside its build artifact** — a
@@ -101,16 +111,35 @@ below, not a bypass of it).
 |---|---|---|---|
 | `{{solution}}` | {{image name, or venv path / binary path}} | {{fast local rebuild / real re-download}} | {{path, or "none"}} |
 
-Get an explicit yes before running — this is the one command in the set
-that isn't a no-op-safe re-run. If a solution has data outside its build
-artifact, that question is separate from the general confirm: make sure
-the user answered *that* question specifically (or passed `--purge-data`),
-not just "yes, run the command."
+This is the one command in the set that isn't a no-op-safe re-run. If a
+solution has data outside its build artifact, that question is a **separate
+gate** from the general confirm: make sure the user answered *that* question
+specifically (or passed `--purge-data`), not just "yes, run the command."
+
+🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
+
+> 🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
+>
+> **Human decision needed:** Proceed with `remove` for the solution(s)
+> listed in the plan? (yes / no)
+
+If host data is in scope and `--purge-data` was **not** passed, a second
+gate first:
+
+🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
+
+> 🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
+>
+> **Human decision needed:** Also delete data outside the build artifact
+> at `<path>`?
+>
+> **A)** Keep the data (default)
+> **B)** Purge that data too
 
 **Execute (only after confirmation):**
 ```bash
 cd {{project-root}}
-{{remove command per solution, e.g. docker compose down <service> --rmi local -v, or rm -rf .venv && rm -f tools/x/binary}}
+{{remove command per solution, e.g. docker compose down --rmi local  (add -v only if named volumes are in the confirmed plan), or rm -rf .venv && rm -f tools/x/binary}}
 ```
 
 If (and only if) the data question was answered yes / `--purge-data` was
