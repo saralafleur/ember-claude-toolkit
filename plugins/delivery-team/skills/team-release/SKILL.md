@@ -2,6 +2,16 @@
 name: team-release
 description: 'Run a small virtual release team (release-scribe, release-lead) over everything that shipped in a version and produce a client-facing release-notes.md — on any project. Use when: one or more team-build runs are done (verified green) and you want to tell the client what changed; you are cutting a version and need plain-language notes for a non-technical client; you want to bundle several work items into ONE client release doc; or you need release notes that are fact-checked against the actual shipped commits, not just what a report claimed. Produces a client-facing release-notes.md plus a private crosswalk mapping every note back to its item/commit/decision, and remembers each release in a release-log.'
 argument-hint: '[<version/folders> | auto|auto-pilot <version/folders> | direct <version/folders>] — a version label (e.g. v0.7.3) and/or the folder(s) holding the shipped work. Optional — the skill will ask what is in the release if omitted. See "Run modes" for the auto-pilot/direct tokens.'
+allowed-tools:
+  - Read
+  - Write
+  - Edit
+  - Grep
+  - Glob
+  - Bash
+  - AskUserQuestion
+  - Workflow
+  - Workflow(delivery-team:release-autopilot)
 ---
 
 # Team Release
@@ -44,11 +54,15 @@ delegate each role to a subagent. You are the release lead's editor.
 > and `~/.claude/agents/<name>.md` means "the matching file in this plugin's
 > own `agents/` folder" — same relative layout, different root.
 
-> **How to invoke each role:** launch each with `subagent_type: "<name>"`
-> (e.g. `subagent_type: "release-scribe"`). Give each: the version label, the
-> list of shipped items with their artifact paths, and the output dir. (If a
-> name isn't a subagent type, fall back to `general-purpose` and paste the
-> role brief from `~/.claude/agents/<name>.md`.)
+> **How the team actually runs:** under **auto-pilot**, `release-scribe` and
+> `release-lead` (Steps 2–3, plus any redraft loop) run inside one `Workflow`
+> call — `workflows/release.js` — not as `Agent` calls you make directly.
+> Under **standard or direct mode**, they're plain `Agent` calls exactly as
+> written in Steps 2–3 below — launch each with `subagent_type: "<name>"`
+> (e.g. `subagent_type: "release-scribe"`), giving each the version label,
+> the item list with artifact paths, and the output dir. (Standard mode
+> keeps its own gates a workflow script has no way to express — see the
+> callout at the top of Step 2.)
 
 ## Run modes
 
@@ -120,7 +134,41 @@ docs live; if none is configured, write to `<project-root>/releases/<version>/`
 different location, use it. **Never** scatter release notes inside a single
 item's build folder — a release spans items.
 
-### Step 2 — Draft the client notes
+**Under auto-pilot:** Steps 2 and 3 below (draft, fact-check/finalize,
+including the lead→scribe→lead redraft loop) run as one `Workflow` call
+instead — standard/direct mode keeps running them as written below, since
+this skill's SHIP gate and scope-reopening gate have no pause-for-human
+primitive to express inside a script.
+
+```
+Workflow({
+  scriptPath: "~/.claude/skills/team-release/workflows/release.js",
+  args: {
+    version: "<version>",
+    items: [ {slug, path, buildReportPath}, ... ],
+    outputDir: "<output-dir-from-step-1>",
+    scopeAssumptionNote: "<Step 0's DECIDED-AUTO scope pick, if any>",
+    priorCrosswalkPath: "<prior release-crosswalk.md, re-entry passes only>",
+    priorReleaseLogStatus: "<prior release-log Status token, re-entry passes only>"
+  }
+})
+```
+
+(Under a plugin install, `scriptPath` is
+`${CLAUDE_PLUGIN_ROOT}/skills/team-release/workflows/release.js` instead —
+same "Path note" translation as everywhere else in this file.)
+
+The QUALITY rule (a claim no commit supports gets repaired/cut, never
+shipped) still binds exactly as described in Step 3 — it's a repair mandate
+inside the script now, not a stop-and-wait. The run goes silent in this
+session until it completes; say so before starting it. It returns
+`status: 'ready-to-send'` plus what the lead repaired/cut/added — identical
+in substance to what auto-pilot already reported before this conversion,
+since this skill never transmits anything itself in any mode. Use the
+return value directly in Step 4's report-back; the SHIP gate itself (Step 4)
+still runs in this session, not inside the workflow.
+
+### Step 2 — Draft the client notes (standard/direct mode)
 Run `release-scribe` with the version, the item list + artifact paths, and
 the output dir. It **seeds both documents from
 `~/.claude/skills/team-release/templates/`** (their structure is the
@@ -130,7 +178,7 @@ plan / decisions, and writes:
 - `release-crosswalk.md` (private: each note → item/decision; the Commit(s)
   column stays `—` — it is lead-owned, filled during Step 3 verification)
 
-### Step 3 — Fact-check + finalize (gate)
+### Step 3 — Fact-check + finalize (standard/direct mode, gate)
 Run `release-lead`. It verifies every client-facing claim against the
 **actual git commits** in the release range (over-claim → cut/return;
 shipped-but-omitted → add), sweeps `release-notes.md` for any leaked internal
