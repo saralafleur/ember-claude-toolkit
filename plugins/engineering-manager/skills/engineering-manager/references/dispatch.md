@@ -62,52 +62,64 @@ decide — say so plainly ("only one build-ready item found; just run
 single item. There's nothing to recommend when there's no split to decide
 between — this is a degenerate case, not a preference.
 
-## Step 1 — Analyze independence
+## Step 1-2 — Run the decide pipeline
 
-Run `em-analyst` on the candidate set (paths to each item's
-`technical-plan.md`, `pm-plan.md` — its cost/scope framing and
-durable-fix-vs-patch call are dispatch-relevant — `decisions.md`, QA
-`test-plan.md`, and `qa-assessment.md` if one exists — its coverage verdict
-matters: BLIND is not ADEQUATE; note any existing
-open efforts from this project's effort-worktree registry, if one exists, so
-the analyst can check candidates against work already in flight, not just
-against each other). Also hand it
+Gather what `em-analyst` needs before starting: paths to each candidate's
+`technical-plan.md`, `pm-plan.md` (its cost/scope framing and
+durable-fix-vs-patch call are dispatch-relevant), `decisions.md`, QA
+`test-plan.md`, and `qa-assessment.md` if one exists (its coverage verdict
+matters: BLIND is not ADEQUATE); any existing open efforts from this
+project's effort-worktree registry, if one exists; and
 this plugin's own bundled `memory/standing-constraints.md` — the
 durable shared-DB/registry/ceiling facts past runs already paid judge
-panels to establish; the analyst treats them as facts, so this same file
-can go to the judge panel too without compromising vote independence.
+panels to establish.
 
-## Step 1.5 — Judge panel (conditional)
+Then run the decide pipeline — analyst, the conditional judge panel, and
+synthesis — as one call:
 
-**Only if `em-analyst` reported confidence LOW**, run `em-judge` 2-3 times in
-parallel (one message, multiple tool calls), each given the same candidate
-set plus the analyst's findings and its stated ambiguity. If confidence was
-HIGH, skip this step entirely — don't spend the calls on an uncontested
-read. **Any confidence rating other than an explicit HIGH is treated as LOW
-(the panel convenes)** — the analyst's contract is binary, and an
-out-of-vocabulary rating (a past run once returned "MEDIUM") must never
-silently default to skipping the one safety net a wrong-HIGH would bypass.
+```
+Workflow({
+  scriptPath: "~/.claude/skills/engineering-manager/workflows/decide.js",
+  args: {
+    kind: "dispatch",
+    targetDir: "<target>",
+    runId: "<YYYY-MM-DD>-<run-slug>",
+    candidates: [ {slug, path, note?}, ... ],
+    standingConstraintsPath: "~/.claude/skills/engineering-manager/memory/standing-constraints.md",
+    existingEffortsNote: "<open efforts from the effort-worktree registry, if any>"
+  }
+})
+```
 
-## Step 2 — Synthesize the decision
+(Under a plugin install, `scriptPath` is
+`${CLAUDE_PLUGIN_ROOT}/skills/engineering-manager/workflows/decide.js`
+instead — same "Path note" translation as elsewhere in this repo.)
 
-Run `em-lead` with the analyst's findings (+ judge votes, if the panel ran)
-and this run's id (`<YYYY-MM-DD>-<run-slug>`, e.g.
-`2026-08-14-resume-two-builds`). It writes
-`<target>/.em-state/<run-id>/dispatch-plan.md` and updates the
-`<target>/.em-state/LATEST-dispatch` pointer — the final PARALLEL/
-SEQUENTIAL/SINGLE-SESSION decision, the per-item dispatch spec (provisional
-branch/worktree per `provision_worktrees.py`'s formula, the exact
-self-contained dispatch prompt with the protocol block from
-`templates/dispatch-protocols.md` baked in verbatim), and the merge order.
-Plans never live at a fixed `<target>/dispatch-plan.md` path anymore — each
-run's plan sits in its own `.em-state/<run-id>/` directory alongside the
-run's state, and `LATEST-dispatch` is the stable "current plan" lookup.
+This one call replaces what used to be three separate steps — analyze
+independence, the conditional judge panel, and synthesis. The mechanics are
+all still true, just executed by the script now instead of by you:
+- `em-analyst` proposes PARALLEL/SEQUENTIAL/SINGLE-SESSION with a confidence
+  rating.
+- **Any confidence rating other than an explicit HIGH is treated as LOW**
+  (the panel convenes) — an out-of-vocabulary rating (a past run once
+  returned "MEDIUM") must never silently skip the one safety net a
+  wrong-HIGH would bypass. Only if confidence is LOW does the script convene
+  a 3-way `em-judge` panel, in parallel.
+- `em-lead` reconciles the analyst (+ judges, if run) into
+  `<target>/.em-state/<run-id>/dispatch-plan.md`, updates the
+  `<target>/.em-state/LATEST-dispatch` pointer — the per-item dispatch spec
+  (provisional branch/worktree per `provision_worktrees.py`'s formula, the
+  exact self-contained dispatch prompt with the protocol block from
+  `templates/dispatch-protocols.md` baked in verbatim), and the merge order
+  — all via its own `Write` tool, unchanged. **Dispatch prompts never carry
+  a mode token, in any mode** — `team-build` parses no mode tokens anymore
+  and runs fully autonomous regardless (its own "No gates, no modes"
+  section). Auto-pilot here changes only *this* skill's own PREFERENCE gates
+  (Steps 3 and 5 below), nothing downstream.
 
-**Mode note:** even if this `dispatch` run is itself in auto-pilot, the
-dispatch prompts do **not** carry a mode token — `team-build` parses no
-mode tokens anymore and runs fully autonomous in every mode (its own
-"No gates, no modes" section). Auto-pilot here changes only *this* skill's
-PREFERENCE gates (Steps 3 and 5), nothing downstream.
+The run goes silent in this session until it completes; say so before
+starting it. It returns an object (`decisionType`, `disagreementNoted`,
+`flaggedForHuman`, `panelRan`); use it in Step 3 below.
 
 If the decision is **SINGLE-SESSION**: present that recommendation and stop
 — there is nothing to dispatch. Suggest running `team-build` normally.

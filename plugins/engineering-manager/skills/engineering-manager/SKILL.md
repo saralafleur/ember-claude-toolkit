@@ -1,6 +1,16 @@
 ---
 name: engineering-manager
 argument-hint: "[auto|auto-pilot] [triage <folder>|dispatch <folder>|status|resume <item-slug> <answer>] — see \"Run modes\" for the auto-pilot/auto token."
+allowed-tools:
+  - Read
+  - Grep
+  - Glob
+  - Bash
+  - AskUserQuestion
+  - Agent
+  - SendMessage
+  - Workflow
+  - Workflow(engineering-manager:decide)
 description: >
   Evaluates a folder's outstanding work (typically team-status's stage-map)
   and gets it moving on whatever track it actually needs. `triage` sorts

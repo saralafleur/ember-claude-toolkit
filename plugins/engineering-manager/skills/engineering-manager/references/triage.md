@@ -95,49 +95,68 @@ mechanical — no `em-analyst` call needed; just read the file paths.
   per file — the per-file clobber protection above is about concurrent
   writers to the same file, not about maximizing delegate count.
 
-## Step 3 — Analyze the NEEDS-INTAKE set (only if 2+ items)
+## Step 3-4 — Run the decide pipeline (only if 2+ NEEDS-INTAKE items)
 
 If there's exactly one NEEDS-INTAKE item, skip straight to Step 5 with it as
 a SINGLE-SESSION-shaped group of one — no analyst needed for a single item,
-same as `dispatch`.
+same as `dispatch`. **Do not call the workflow below for a single item.**
 
-Run `em-analyst` on the NEEDS-INTAKE set. Since none of these have a
-`technical-plan.md` yet, hand it each item's raw description/request text
-(plus the project's own request-log entry if `PROJECT-CONTEXT.md` names
-one, else whatever lives in the item's own `intake/*/` folders — the
-*global* request-log was retired 2026-08-14; the only surviving global
-registry is team-intake's `decision-log.md` fallback) and
-this plugin's own bundled `memory/standing-constraints.md`
-(established shared-DB/registry facts) instead — the analyst's
-job here is: do any of these target the same code area closely enough that
-one intake should see the other's conclusion first (SEQUENTIAL), are any
-small enough and similar enough that combining them into one intake request
-saves real overhead without muddying the ask (BATCHED — name which items
-combine into one request document), or is everything independent enough to
-run concurrently (PARALLEL)? Same LOW-confidence → `em-judge` panel rule as
-`dispatch`, including its input validation: **any confidence rating other
-than an explicit HIGH is treated as LOW (the panel convenes)** — never let
-an out-of-vocabulary rating (e.g. "MEDIUM") silently skip the panel.
+Otherwise, gather what `em-analyst` needs: since none of these have a
+`technical-plan.md` yet, each item's raw description/request text (plus the
+project's own request-log entry if `PROJECT-CONTEXT.md` names one, else
+whatever lives in the item's own `intake/*/` folders — the *global*
+request-log was retired 2026-08-14; the only surviving global registry is
+team-intake's `decision-log.md` fallback), and
+this plugin's own bundled `memory/standing-constraints.md`.
 
-## Step 4 — Synthesize
+Then run the decide pipeline — analyst, the conditional judge panel, and
+synthesis — as one call:
 
-Run `em-lead` with the analyst's findings (+ judge votes, if run) plus the
-HOUSEKEEPING grouping from Step 2 and this run's id
-(`<YYYY-MM-DD>-<run-slug>`). It writes
-`<target>/.em-state/<run-id>/triage-plan.md` and updates the
-`<target>/.em-state/LATEST-triage` pointer (see `templates/triage-plan.md`
-for section order): the housekeeping delegate list, the intake
-grouping decision (PARALLEL/SEQUENTIAL/BATCHED/SINGLE-SESSION) with per-item
-or per-batch dispatch specs, and the NEEDS-HUMAN list for the human gate to
-see (not to dispatch). Plans never live at a fixed `<target>/triage-plan.md`
-path anymore — each run's plan sits in its own `.em-state/<run-id>/`
-directory, and `LATEST-triage` is the stable "current plan" lookup.
+```
+Workflow({
+  scriptPath: "~/.claude/skills/engineering-manager/workflows/decide.js",
+  args: {
+    kind: "triage",
+    targetDir: "<target>",
+    runId: "<YYYY-MM-DD>-<run-slug>",
+    candidates: [ {slug, path, note?}, ... ],  // each item's raw request text/path
+    standingConstraintsPath: "~/.claude/skills/engineering-manager/memory/standing-constraints.md",
+    housekeepingGrouping: <Step 2's file-grouped housekeeping list>
+  }
+})
+```
 
-**Mode note:** even if this `triage` run is itself in auto-pilot, the
-dispatch prompts do **not** carry a mode token — `team-intake` runs fully
-autonomous in every mode and accepts the legacy tokens only as no-ops.
-Auto-pilot here changes only *this* skill's own PREFERENCE gates (Step 5),
-nothing downstream.
+(Under a plugin install, `scriptPath` is
+`${CLAUDE_PLUGIN_ROOT}/skills/engineering-manager/workflows/decide.js`
+instead — same "Path note" translation as elsewhere in this repo.)
+
+This one call replaces what used to be two separate steps — analyzing the
+NEEDS-INTAKE set and synthesis. The mechanics are all still true, just
+executed by the script now instead of by you:
+- `em-analyst`'s job here: do any of these target the same code area closely
+  enough that one intake should see the other's conclusion first
+  (SEQUENTIAL), are any small enough and similar enough that combining them
+  into one intake request saves real overhead without muddying the ask
+  (BATCHED — naming which items combine), or is everything independent
+  enough to run concurrently (PARALLEL)?
+- Same LOW-confidence → `em-judge` panel rule as `dispatch`, including its
+  input validation: **any confidence rating other than an explicit HIGH is
+  treated as LOW (the panel convenes)** — never let an out-of-vocabulary
+  rating (e.g. "MEDIUM") silently skip the panel.
+- `em-lead` writes `<target>/.em-state/<run-id>/triage-plan.md` and updates
+  the `<target>/.em-state/LATEST-triage` pointer (see
+  `templates/triage-plan.md` for section order): the housekeeping delegate
+  list (passed in as `housekeepingGrouping`, not derived by the agent), the
+  intake grouping decision with per-item or per-batch dispatch specs, and
+  the NEEDS-HUMAN list for the human gate to see (not to dispatch) — all via
+  its own `Write` tool, unchanged. **Dispatch prompts never carry a mode
+  token, in any mode** — `team-intake` runs fully autonomous regardless and
+  accepts legacy tokens only as no-ops. Auto-pilot here changes only *this*
+  skill's own PREFERENCE gates (Step 5 below), nothing downstream.
+
+The run goes silent in this session until it completes; say so before
+starting it. It returns an object (`decisionType`, `disagreementNoted`,
+`flaggedForHuman`, `panelRan`); use it in Step 5 below.
 
 **If the decision is SINGLE-SESSION** (nothing benefits from splitting):
 present that recommendation and stop — same rule as `dispatch.md` Step 2 —
