@@ -2,6 +2,15 @@
 name: team-build
 description: 'Run a virtual engineering team (build-triage, build-planner, test-author, implementer, verifier, reviewer, build-lead) over an approved plan to actually BUILD it — on any project. Use when: a team-intake technical-plan and a team-qa test-plan exist and the work now needs to be implemented; you want code written test-first and proven red→green before it is declared done; you have an approved change to build and want it built without re-litigating the design; or a project has its own recurring-defect catalog and you want any durable structural cure actually applied instead of an inline shortcut. Runs end-to-end with no stop-and-ask checkpoints — every decision that used to pause for a human is now auto-decided and logged, and a green build commits + pushes automatically on its own effort branch. Produces a reviewable (after the fact) diff in an isolated per-effort git worktree plus a build-report, and remembers when a build re-takes a shortcut so the team stops shipping the same regression — when the project has a defect catalog configured to remember it in.'
 argument-hint: '<path> — path to the completed intake folder (holding intake/.../technical-plan.md and, if one exists yet, qa/.../test-plan.md). A build/ subfolder is created inside it for the build artifacts. Required — this skill no longer asks if it''s omitted; see "No gates, no modes" below.'
+allowed-tools:
+  - Read
+  - Write
+  - Edit
+  - Grep
+  - Glob
+  - Bash
+  - Workflow
+  - Workflow(delivery-team:build)
 ---
 
 # Team Build
@@ -95,13 +104,14 @@ agents to fold or skip.
 > and `~/.claude/agents/<name>.md` means "the matching file in this plugin's
 > own `agents/` folder" — same relative layout, different root.
 
-> **How to invoke each role:** these are registered subagent types — launch
-> each with `subagent_type: "<name>"` (e.g. `subagent_type: "build-implementer"`).
-> Always give the agent: the `build-brief.md` path, the output dir, the paths
-> to `technical-plan.md` and `test-plan.md`, and (once known) the ordered task
-> list. (If a name isn't available as a subagent type, fall back to a
-> `general-purpose` agent and paste the role brief from
-> `~/.claude/agents/<name>.md`.)
+> **How the team actually runs:** `build-triage` through `build-lead`
+> (Steps 1–7) run inside one `Workflow` call — `workflows/build.js` — not as
+> `Agent` calls you make directly; the script invokes each by its registered
+> subagent type and reuses these same agent files unchanged. **Step 8's
+> commit/push is not part of the workflow** — a script has no filesystem or
+> git access of its own, and this was always your own action (same
+> convention as `wrap-up`), not an agent's; you still run it directly, after
+> the workflow returns.
 
 ## Process
 
@@ -140,90 +150,62 @@ follow the mechanism `PROJECT-CONTEXT.md` names exactly (script, files it
 updates, commit convention), and log the decision to `decisions.md` as
 `DECIDED-AUTO` with the rationale.
 
-### Step 1 — Triage + safety gate
-Run `build-triage`. It confirms both plans are present and buildable,
-discovers the project's repo layout (checking `PROJECT-CONTEXT.md` first, else
-discovering it), **provisions a per-effort worktree for every repo in that
-layout** (new branch off its base branch for repos the plan touches,
-base-branch HEAD for untouched ones), generates a namespaced Docker compose
-stack if the project has one, **confirms each worktree is clean**, records the
-**starting commit per repo**, registers the effort if this project has a
-registry configured, writes `build-brief.md`, and returns a `READY` /
-`BLOCKED` verdict.
+### Step 1 — Run the build pipeline
 
-**What happens instead of asking:**
-- **`BLOCKED` because a worktree is dirty:** auto-pick the skill's own
-  already-safe option — `git stash -u` on the dirty worktree — log it to
-  `decisions.md` as `DECIDED-AUTO`, and proceed. Stashing is reversible.
-- **`BLOCKED` because a plan is missing/incomplete:** there is genuinely
-  nothing to auto-decide here — the input itself isn't real, and inventing
-  a plan to keep going would defeat the entire point of this being a
-  *build* team, not a design team. **This is where the run ends** — not a
-  mid-conversation pause, just the run's outcome: report exactly what's
-  missing/unclear in the final chat output (same as reporting any other
-  failure) and stop. No commit has happened; nothing is left in an
-  ambiguous state. Re-running `team-intake`/`team-qa` on the gap and
-  invoking `team-build` again is the next step, on the human's own time.
-- **Log every auto-decision** (see "Decision logging").
+Run the entire triage-through-lead sequence as one call:
 
-### Step 2 — Plan the build
-Run `build-planner`. It reads `technical-plan.md` + `test-plan.md` + the brief
-and writes `build-task-list.md`: one **ordered, dependency-correct** task list,
-with each step independently checkable. It marks every **durable-cure** step
-this project's defect catalog (if configured) calls for as **MANDATORY — not
-optional**, citing the catalog id. Capture the ordered list — the next steps
-follow it.
+```
+Workflow({
+  scriptPath: "~/.claude/skills/team-build/workflows/build.js",
+  args: {
+    intakeDir: "<intake-dir>",
+    technicalPlanPath: "<intake-dir>/intake/.../technical-plan.md",
+    testPlanPath: "<intake-dir>/qa/.../test-plan.md",
+    buildDir: "<intake-dir>/build/<date>-<slug>"
+  }
+})
+```
 
-### Step 3 — Author the tests, red-first
-Run `build-test-author`. It writes the tests named in `test-plan.md`, runs
-them, and **proves each one RED** against the current (unbuilt) code in this
-effort's worktree, recording the exact failing output. It changes test files
-only — **no product code**.
+(Under a plugin install, `scriptPath` is
+`${CLAUDE_PLUGIN_ROOT}/skills/team-build/workflows/build.js` instead — same
+"Path note" translation as everywhere else in this file.)
 
-**What happens instead of asking, if a test that should be red passes green
-already:** that's a signal the plan is wrong or the behavior already exists.
-There's no safe auto-decision for a contradiction like this — papering over
-it (or silently weakening the assertion to force a red) is exactly the
-shortcut this whole team exists to prevent. **This is where the run ends**:
-report it plainly in the final chat output (which test, why it's already
-green, what that implies about the plan) and stop, same as the Step 1
-missing-plan case above.
+This one call replaces what used to be seven separate steps — triage, plan,
+red, implement, verify, review, and lead synthesis. The mechanics described
+in the old Steps 1–7 are all still true, just executed by the script now
+instead of by you:
+- **`build-triage`** confirms both plans, discovers the repo layout,
+  provisions a per-effort worktree (+ Docker stack) per repo, gates on a
+  clean tree, and records the starting commit(s) — all via its own
+  `Write`/`Bash` tools, unchanged. **A dirty worktree is auto-stashed
+  (`git stash -u`) by the agent itself and reported `READY`** — the script
+  has no shell access to do this itself, so triage's own tools are what
+  make this possible; a genuinely **missing/incomplete plan** is the one
+  case that still comes back `BLOCKED`, and the script ends the run there —
+  report it plainly and stop, same as before.
+- **`build-planner`** writes `build-task-list.md`, marking every
+  project-specific durable-cure step **MANDATORY**.
+- **`build-test-author`** writes the tests and proves each one RED. **If a
+  test that should be red is already green**, the script ends the run there
+  too — that's a signal the plan is wrong, not something to loop past.
+- **Implement → verify → review runs as one bounded loop** (up to 3 cycles):
+  `build-implementer` applies the change set, `build-verifier` runs the full
+  suites + Definition of Done, and — once verify is GREEN —
+  `build-reviewer` does the adversarial diff review. A verify failure *or* a
+  real defect the reviewer finds both re-enter the loop at
+  `build-implementer`; running out of cycles without converging ends the run
+  there, same "report plainly, don't force a 4th attempt" discipline as
+  before.
+- **`build-lead`** writes `build-report.md`, updates the build run-log, and
+  updates this project's defect catalog if this build re-applied a cure or
+  exposed a new trap.
 
-### Step 4 — Implement to green (sequential)
-Run `build-implementer`. It works `build-task-list.md` **in order**, applying
-the change set from `technical-plan.md` to make the red tests pass, inside
-this effort's worktree. Hard rules it carries:
-- Apply any structural cure the plan marked MANDATORY; do not substitute an
-  inline patch.
-- One implementer, sequential — no parallel edits to the same files.
-- Keep changes scoped to the task list; if it discovers the plan is wrong
-  mid-build, it stops and reports rather than improvising a different design.
-
-### Step 5 — Verify
-Run `build-verifier`. It brings up this effort's own isolated Docker stack (if
-the project has one and the plan's scope needs it), runs the **full relevant
-suites**, confirms **each new test went red→green**, and runs the Definition
-of Done from the plans plus any standing guards this project's defect catalog
-calls for. It records the green evidence.
-
-**What happens instead of asking, if anything is red or a DoD item fails:**
-loop back to **Step 4** (implementer fixes), bounded — after ~3 fix attempts
-without convergence, **this is where the run ends**: report it plainly (what's
-still failing, what was tried) and stop. Never edit a test to make it pass, no
-silent 4th attempt — a build that can't converge in 3 tries needs a human to
-look at it, but it gets told that as a final report, not asked mid-run.
-
-### Step 6 — Adversarial review
-Run `build-reviewer`. It reviews the **diff since the starting commit**, per
-touched repo, against this project's known traps (if it has a defect catalog
-configured) plus ordinary correctness/simplification. A real defect loops back
-to **Step 4**.
-
-### Step 7 — Synthesize + report
-Run `build-lead`. It writes `build-report.md`, updates the build run-log, and
-— if the build had to re-apply a known cure, took (or was tempted to take) a
-shortcut, or exposed a new repeatable build trap, and this project has a
-defect catalog configured — updates it. Capture its headline.
+The run goes silent in this session until it completes — a background job,
+not a live stream — so say so before starting it. It returns an object
+(`status`, `cycles`, `worktrees`, `reportPath`, `headline`); use it in Step
+8 below. **A `status` of `BLOCKED` means the run ended early** (at triage,
+red, verify, or review) — report the reason plainly and stop; do not
+proceed to Step 8's ship.
 
 ### Step 8 — Ship, then report
 **Commit on this effort's own isolated branch (the one `build-triage`
@@ -233,8 +215,9 @@ floor still applies without exception: **never force-push, never
 `--no-verify`, never push straight to the repo's default branch.**
 
 Append the resulting commit SHA (per repo) to `build-report.md`'s "Shipped
-commit" field — `build-lead` can't fill this in at Step 7 since the commit
-hasn't happened yet, but leaving it blank is how `team-release`'s
+commit" field — `build-lead` can't fill this in during the build pipeline
+since the commit hasn't happened yet, but leaving it blank is how
+`team-release`'s
 `release-lead` ends up re-deriving shipped commits from raw git history
 instead of reading them. **Confirm the field was actually updated before
 ending the session** — it's easy to commit and move on without circling
