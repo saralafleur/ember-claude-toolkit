@@ -28,6 +28,10 @@ diluted by finished work.
 |---|-------------|:------:|:--:|:-----:|:------:|-------|
 | <n> | <slug> | ✅/❌/➡️ | ✅/❌/➡️ | ✅/❌/➡️ | ✅/❌/➡️ | <one line: what's actually true right now> |
 
+_(At batch scale this may be split into several sub-tables grouped by
+area/phase — that's the shape real 40-item reports have converged on. The
+row schema above is the contract; the single-table layout is not.)_
+
 > Legend: **✅** done · **❌** not done / not applicable to this item ·
 > **➡️** partially done (e.g. built but never committed/merged, or a scanner
 > found it incomplete). A `stale` or `contradicted-by-live-code` finding goes
@@ -45,7 +49,9 @@ below" — don't leave an empty table with no explanation.)_
 Items that have graduated out of the Stage-map above: all four columns
 (Intake/QA/Build/Merged) are ✅ **and** the Merged-item follow-up type
 (below) is `NONE` — genuinely nothing left, not even a doc/operational/
-future-scoping residual. **The moment an item first meets this bar, move its
+future-scoping residual — **or** whose only residual a human has explicitly
+accepted via a `WATCH`/`RECORD` entry in `status-decisions.md` (cite it in
+Notes). **The moment an item first meets this bar, move its
 row here and remove it from the Stage-map** — don't leave it in both places.
 This table is deliberately displayed **second**, after the Stage-map, so the
 outstanding work is what a reader sees first.
@@ -53,6 +59,8 @@ outstanding work is what a reader sees first.
 | # | Item (slug) | Notes |
 |---|-------------|-------|
 | <n> | <slug> | Ready for deployment. |
+| <n> | <slug> | Ready for deployment — residual accepted per status-decisions.md <id>. |
+| <n> | <slug> | Released in <version> per release-log. |
 
 _(Omit this whole section if no item currently qualifies — everything still
 has some open thread, so the Stage-map above is the complete picture.)_
@@ -82,6 +90,20 @@ _(Omit this whole section if no item in the stage-map has Merged = ✅ yet.)_
 
 ---
 
+## Changed since last run
+
+> The delta against the prior `status-report.md` (`LAST_RUN: <timestamp>`),
+> from the SKIP/RESCAN split. First run: "first run — no prior report."
+
+- **Flipped:** <item> — <e.g. Merged ❌→✅ this run (evidence)>
+- **Touched but cosmetic (cache trusted):** <item> — touched at `<time>`,
+  fingerprint re-checked and unchanged — treated as cosmetic.
+- **Rescan triggers:** <item> — <which fingerprint field changed, old → new>.
+- **Carried forward unverified** _(trust-cache runs only)_: <item> —
+  unverified since `<LAST_RUN>`.
+
+---
+
 ## Report-vs-reality discrepancies
 
 > The highest-value section. Each place a plan/report claim did NOT match what the
@@ -91,13 +113,19 @@ _(Omit this whole section if no item in the stage-map has Merged = ✅ yet.)_
 - **<item slug> — <claim>:** report said `<quote>` → live check showed `<what you
   found>` (evidence: `<command run / grep / file state>`). Impact: <why it matters>.
 
+**Previously accepted (not re-headlined):**
+- <item slug> — <finding> — accepted per `status-decisions.md` <id>.
+
 ---
 
-## Open decisions (PENDING / PARKED)
+## Open decisions (PENDING / PARKED / WATCH / DEFERRED)
 
 | DEC-id | Item | Status | Waiting on |
 |--------|------|--------|------------|
-| <DEC-n> | <slug> | PENDING / PARKED | <what/who> |
+| <id> | <slug> | PENDING / PARKED / WATCH / DEFERRED | <what/who> |
+
+**DEC entries flipped to `DECIDED-AUTO` since the last status run: <N>
+(unreviewed by a human)** — <ids, when few>.
 
 _(None, if the item decision logs are all DECIDED.)_
 

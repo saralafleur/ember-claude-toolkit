@@ -18,6 +18,15 @@ consumes that report's own re-verified findings, it doesn't re-derive them.
 Don't triage from a stale or missing report. There's nothing to recommend
 against a report that isn't trustworthy.
 
+**Alternate entry path (exercised 2026-07-28→29, legitimate):** a fresh
+request set the user types or hands over directly is a valid candidate
+source with no status-report at all — the staleness gate above guards
+*report-derived* facts, and a user-stated request set has none. In that
+case there is usually no housekeeping bucket (nothing verified stale);
+bucket the user's items as NEEDS-INTAKE/NEEDS-HUMAN as usual and proceed
+from Step 3, saying plainly in the report-back that this run triaged a
+direct request set, not a report.
+
 ## Step 1 — Bucket every outstanding action item
 
 Walk the Stage-map, the Merged-item follow-ups table, and the Recommended
@@ -42,14 +51,20 @@ should be passing but isn't, code behaving differently than its own spec)
 belongs here too — even if urgent, it still needs a plan before it needs a
 build.
 
-**Deliberately no NEEDS-QA bucket.** An item that has a `technical-plan.md`
-but no `test-plan.md` yet is real outstanding work, but this skill doesn't
-triage or dispatch it — `dispatch`'s own build-ready filter requires
-Intake✅ **and** QA✅ already true (see `dispatch.md`), so an item sitting
-between intake and QA simply isn't a candidate for either command yet. This
-is intentional, not an unbuilt bucket: report it plainly as outstanding
-(it'll show up in `team-status`'s stage-map either way) and name `team-qa`
-as its next step, but don't invent a dispatch path for it here.
+**Deliberately no NEEDS-QA bucket — updated 2026-08-15.** The *pre-build*
+QA gap no longer needs any routing at all: an item with a
+`technical-plan.md` but no `test-plan.md` is already a `dispatch` candidate
+(dispatch's filter is Intake✅ + Build❌/➡️ — `team-build` auto-runs
+`team-qa` on a missing test-plan, see `dispatch.md` Step 0), so just note
+that dispatch will pick it up. The case that *does* need a route is
+**post-build QA debt**: an item whose stage is `build-green-with-qa-debt`
+(a build shipped with QA deliberately deferred). None of the three buckets
+fits it — it isn't housekeeping, it has a technical-plan so it isn't
+NEEDS-INTAKE, and no human is required. Report it plainly as outstanding
+and name **`team-qa` on that item's folder** as its next step (the deferred
+QA run is the recorded debt coming due) — but don't invent a dispatch path
+for it here; running team-qa is a one-skill action the user (or a plain
+session) invokes directly.
 
 **NEEDS-HUMAN** — requires production/live-data access, repo-admin/GitHub
 settings, credentials, or is explicitly named in the report as the user's
@@ -67,10 +82,18 @@ List every HOUSEKEEPING correction with its exact file path. Any two
 corrections touching the **same file** go in the same delegate (sequential
 edits inside one agent call, not two concurrent ones — concurrent Edit
 calls against the same file from two different agents can clobber each
-other, since each reads-then-writes independently). Corrections in
-different files can each be their own delegate, dispatched together in one
-parallel batch. This grouping is mechanical — no `em-analyst` call needed;
-just read the file paths.
+other, since each reads-then-writes independently). This grouping is
+mechanical — no `em-analyst` call needed; just read the file paths.
+
+**Size the fan-out to the work (2026-08-15, ratifying real-run practice):**
+- **Fewer than ~3-4 corrections:** don't dispatch at all — apply them
+  directly in-session (verify each old-text match live first, same as a
+  delegate would), and say so in the report-back. Many agent round-trips
+  for a handful of mechanical edits is the shape to avoid.
+- **Larger sets:** dispatch one delegate per *file group*, but prefer one
+  delegate walking several small file groups sequentially over one delegate
+  per file — the per-file clobber protection above is about concurrent
+  writers to the same file, not about maximizing delegate count.
 
 ## Step 3 — Analyze the NEEDS-INTAKE set (only if 2+ items)
 
@@ -80,30 +103,52 @@ same as `dispatch`.
 
 Run `em-analyst` on the NEEDS-INTAKE set. Since none of these have a
 `technical-plan.md` yet, hand it each item's raw description/request text
-(and any request-log/catalog entry that names it) instead — the analyst's
+(plus the project's own request-log entry if `PROJECT-CONTEXT.md` names
+one, else whatever lives in the item's own `intake/*/` folders — the
+*global* request-log was retired 2026-08-14; the only surviving global
+registry is team-intake's `decision-log.md` fallback) and
+this plugin's own bundled `memory/standing-constraints.md`
+(established shared-DB/registry facts) instead — the analyst's
 job here is: do any of these target the same code area closely enough that
 one intake should see the other's conclusion first (SEQUENTIAL), are any
 small enough and similar enough that combining them into one intake request
 saves real overhead without muddying the ask (BATCHED — name which items
 combine into one request document), or is everything independent enough to
 run concurrently (PARALLEL)? Same LOW-confidence → `em-judge` panel rule as
-`dispatch`.
+`dispatch`, including its input validation: **any confidence rating other
+than an explicit HIGH is treated as LOW (the panel convenes)** — never let
+an out-of-vocabulary rating (e.g. "MEDIUM") silently skip the panel.
 
 ## Step 4 — Synthesize
 
 Run `em-lead` with the analyst's findings (+ judge votes, if run) plus the
-HOUSEKEEPING grouping from Step 2. It writes `<target>/triage-plan.md` (see
-`templates/triage-plan.md`): the housekeeping delegate list, the intake
+HOUSEKEEPING grouping from Step 2 and this run's id
+(`<YYYY-MM-DD>-<run-slug>`). It writes
+`<target>/.em-state/<run-id>/triage-plan.md` and updates the
+`<target>/.em-state/LATEST-triage` pointer (see `templates/triage-plan.md`
+for section order): the housekeeping delegate list, the intake
 grouping decision (PARALLEL/SEQUENTIAL/BATCHED/SINGLE-SESSION) with per-item
 or per-batch dispatch specs, and the NEEDS-HUMAN list for the human gate to
-see (not to dispatch).
+see (not to dispatch). Plans never live at a fixed `<target>/triage-plan.md`
+path anymore — each run's plan sits in its own `.em-state/<run-id>/`
+directory, and `LATEST-triage` is the stable "current plan" lookup.
 
-**If this `triage` run is itself in auto-pilot,** tell `em-lead` so — it
-bakes the same `auto`/`auto-pilot` token into each intake delegate's
-dispatch prompt (e.g. "invoke the `team-intake` skill in `auto-pilot` mode
-targeting `<path>`" instead of "invoke the `team-intake` skill targeting
-`<path>`"), so the delegate's own preference gates auto-decide too instead
-of a background delegate stalling on a gate nobody can answer.
+**Mode note:** even if this `triage` run is itself in auto-pilot, the
+dispatch prompts do **not** carry a mode token — `team-intake` runs fully
+autonomous in every mode and accepts the legacy tokens only as no-ops.
+Auto-pilot here changes only *this* skill's own PREFERENCE gates (Step 5),
+nothing downstream.
+
+**If the decision is SINGLE-SESSION** (nothing benefits from splitting):
+present that recommendation and stop — same rule as `dispatch.md` Step 2 —
+suggesting the user run `team-intake` (or make the fix) normally. The one
+exception, exercised 2026-07-27: for an item that is small, fully
+diagnosed, and would gain nothing from a `team-intake` pass, you may
+instead propose handling it **directly in this session** at the Step 5
+gate — but only with the user's explicit in-chat approval of exactly that,
+and the direct work then gets reported and logged like any dispatched
+outcome. Never silently edit product code on a SINGLE-SESSION verdict
+without that approval.
 
 ## Step 5 — Human gate
 
@@ -127,20 +172,29 @@ so explicitly if the user's answer only covers part of the plan.
 for both buckets (housekeeping and intake both dispatch as written) unless
 `triage-plan.md` itself flagged something for direct human attention, which
 stays pulled out and surfaced in the report-back instead. Log the choice to
-`<target>/triage-decisions.md` (from `templates/decision-log.md`, create if
-it doesn't exist) as `DECIDED-AUTO`, state it plainly when reporting back,
-and proceed to Step 6. The NEEDS-HUMAN bucket is never dispatched in any
-mode — auto-pilot doesn't touch it.
+`<target>/triage-decisions.md` as `DECIDED-AUTO` via
+`~/.claude/skills/team-decisions/scripts/add_decision.py` (canonical
+parseable shape; creates the file if needed — see
+`templates/decision-log.md`'s header note), state it plainly when reporting
+back, and proceed to Step 6. The NEEDS-HUMAN bucket is never dispatched in
+any mode — auto-pilot doesn't touch it.
 
 ## Step 6 — Dispatch
 
-**Housekeeping delegates:** for each file group from Step 2, launch
-`Agent(subagent_type: "general-purpose", run_in_background: true)` with a
+**Housekeeping delegates** (only when Step 2's threshold says to dispatch
+at all — below ~3-4 corrections, do them directly in-session instead): for
+each file group, launch
+`Agent(subagent_type: "general-purpose", model: "haiku",
+run_in_background: true)` with a
 fully self-contained prompt — the file path(s), the exact old text and the
 exact new text (or the fact to substitute) per correction, and an
 instruction to read the file first, verify the current text still matches
 before editing (state may have moved since the report was written), and
-report a before/after snippet. No `team-intake`/`team-build` skill
+report a before/after snippet. The cheap/fast model tier is deliberate
+(2026-08-15 audit): the judgment already happened upstream — `team-status`
+verified the facts and Step 2 did the grouping — so the delegate's work is
+a fully-specified mechanical substitution plus the verify-before-edit
+re-check. No `team-intake`/`team-build` skill
 invocation, no BLOCKED protocol — there's no decision to block on, only a
 missing-match to report back if the file no longer says what was expected.
 
@@ -150,20 +204,20 @@ missing-match to report back if the file no longer says what was expected.
 project's root and `PROJECT-CONTEXT.md` location, the request description,
 an instruction to write a `request.md` under a new
 `<target>/<new-item-slug>/` folder and then invoke the `team-intake` skill
-targeting it, and this **BLOCKED protocol**, verbatim (same shape as
-`dispatch`'s, adapted — there's no worktree/branch to reference, just the
-folder):
-
-> If at any point you need a decision only a human can make and it cannot
-> be safely deferred or defaulted, STOP. Do not guess. End your turn with a
-> final message that starts exactly with `BLOCKED:` followed by one clear
-> sentence stating what decision is needed. If intake completes, end with
-> `DONE:` followed by the folder path and a one-line summary of the
-> resulting technical plan. If intake cannot proceed at all, end with
-> `FAILED:` followed by what went wrong.
+targeting it (bare path, no mode token), and the **intake-delegate protocol
+block from `templates/dispatch-protocols.md`, pasted verbatim** — the
+single source for the `BLOCKED:`/`DONE:`/`FAILED:` contract, including the
+durable `request-blocked.md` record an early-blocking delegate must write
+first and the no-vague-non-terminal-endings rule.
 
 Launch every member of a PARALLEL group in the same message (multiple tool
-calls, one message). For SEQUENTIAL, launch only the first; launch the next
+calls, one message) — but respect the **concurrency budget**: groups larger
+than ~3 skill-running delegates dispatch in waves of ~2-3, next wave on the
+previous wave's terminal reports (each `team-intake` delegate spawns ~5-7
+sub-agents of its own against this environment's hard ~20-concurrent
+ceiling; the 2026-08-13 run fired 12 at once and needed a manual retry
+pass — see `memory/standing-constraints.md`). For SEQUENTIAL, launch only
+the first; launch the next
 after its predecessor reports DONE. For BATCHED, there's one delegate per
 batch, not one per original item — the batch's own `request.md` lists each
 original item as a separate ask within one document (see
@@ -171,20 +225,28 @@ original item as a separate ask within one document (see
 calls" discipline that applies here).
 
 Write/update `<target>/.em-state/triage-state.json` immediately after
-dispatching (create the directory if needed) — same shape as
-`dispatch-state.json` (`references/dispatch.md` Step 4), plus a `"kind":
+dispatching, via `scripts/em_state.py update` (schema-enforced — never
+hand-write the JSON): the **same slug-keyed shape as
+`dispatch-state.json`** (`references/dispatch.md` Step 4), plus a `"kind":
 "housekeeping" | "intake"` field per entry so `status`/`resume` can tell
-which protocol applies.
+which protocol applies. (A pre-2026-08-15 triage-state.json may have an
+older ad hoc top-level shape — `em_state.py show` flags such files loudly;
+read them by hand, don't rewrite history.)
 
 ## Step 7 — Monitor and triage
 
 Same classification as `dispatch.md` Step 5 (`DONE:`/`BLOCKED:`/`FAILED:`
 prefixes, including its auto-pilot handling — `BLOCKED:` stays a QUALITY
 gate in every mode, `FAILED:` gets one auto-retry under auto-pilot before
-escalating to a hard stop), applied to both housekeeping and intake
-delegates — housekeeping delegates just won't ever report `BLOCKED:` in
-practice, since there's nothing to block on. Keep `triage-state.json`
-current after every transition.
+escalating to a hard stop, and a vague non-terminal ending gets the same
+read-only verification + explicit resume treatment), applied to both
+housekeeping and intake delegates. Housekeeping delegates won't ever report
+`BLOCKED:` (nothing to block on), and an intake delegate reporting it
+should be rare now that `team-intake` proceeds on recorded assumptions —
+when it does happen, the delegate wrote its question to
+`request-blocked.md` (or the intake `decisions.md`) first, per the
+protocol, so the question survives this session. Keep `triage-state.json`
+current after every transition (via `em_state.py`).
 
 ## Step 8 — Report back and record
 
@@ -193,12 +255,17 @@ the intake grouping decision and each item's outcome (folder path +
 one-line plan summary, or still BLOCKED/FAILED), and the NEEDS-HUMAN list
 presented again as a reminder (nothing was dispatched for these). Note
 explicitly that any completed intake item is now a `dispatch` candidate on
-the next run, not automatically queued. Then append one row to the same run
-log `dispatch` uses (location: `PROJECT-CONTEXT.md`'s "Dispatch run-log"
+the next run, not automatically queued (true since 2026-08-15's filter
+change: dispatch requires Intake ✅ + Build ❌/➡️ — no QA stage in
+between). Then append one row to the same run
+log `dispatch` uses, **via `scripts/append_em_run_log_row.py` — never
+hand-typed** (location: `PROJECT-CONTEXT.md`'s "Dispatch run-log"
 entry if named, else
-this plugin's own bundled `memory/dispatch-run-log.md`) — date ·
-target · housekeeping count · intake decision + items · NEEDS-HUMAN count ·
-outcomes.
+this plugin's own bundled `memory/dispatch-run-log.md`; the
+script creates the file with the standard header if needed). Keep cells
+terse — the run's `.em-state/<run-id>/` plan carries the narrative — and
+promote any durable project-invariant lesson to
+`memory/standing-constraints.md`, which is what future runs actually load.
 
 **`triage` does not run `dispatch.md`'s Step 6/7** (merge, refresh
 `team-status`) — intake delegates don't produce anything to merge, and

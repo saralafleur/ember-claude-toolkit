@@ -31,6 +31,7 @@ SKILL_MAP = {
     'team-build':          'delivery-team/skills/team-build',
     'team-release':        'delivery-team/skills/team-release',
     'team-status':         'delivery-team/skills/team-status',
+    'team-decisions':      'delivery-team/skills/team-decisions',
     'engineering-manager': 'engineering-manager/skills/engineering-manager',
     'wrap-up':             'dev-workflow/skills/wrap-up',
     'create-skill-devops': 'dev-workflow/skills/create-skill-devops',
@@ -75,6 +76,36 @@ SANITIZE = [
     ('make sure Sara answered', 'make sure the user answered'),
     ('ask Sara', 'ask the user'),
     ('Ask Sara', 'Ask the user'),
+    # team-decisions pronoun phrasing (bare "Sara" is caught generically below,
+    # but a bare-word swap reads wrong wherever the surrounding sentence also
+    # carries a gendered pronoun referring to her — fix those together)
+    ('to her directly via AskUserQuestion, recording her answer as a real DECIDED',
+     'to them directly via AskUserQuestion, recording their answer as a real DECIDED'),
+    ('Use when Sara asks', 'Use when the user asks'),
+    ('or right after Sara answers', 'or right after the user answers'),
+    ('used to be hers is now', 'used to be theirs is now'),
+    ('taken off her plate', 'taken off their plate'),
+    ('never gets taken off her\nplate', 'never gets taken off their\nplate'),
+    ('of her — never a wall of raw markdown', 'of them — never a wall of raw markdown'),
+    ("a risk tolerance she hasn't stated anywhere", "a risk tolerance they haven't stated anywhere"),
+    ("fact about her actual intent that the file doesn't carry",
+     "fact about their actual intent that the file doesn't carry"),
+    ('whether she still wants this feature', 'whether they still want this feature'),
+    ('two things she cares about', 'two things they care about'),
+    ("If yes, it's hers.", "If yes, it's theirs."),
+    ('already where a genuinely-hers call goes', 'already where a genuinely-theirs call goes'),
+    ("Put Sara's-call items to her", "Put the user's-call items to them"),
+    ('this is her actual answer (including her', 'this is their actual answer (including their'),
+    ('own wording if she used "Other"', 'own wording if they used "Other"'),
+    ('with her answer) already stated', 'with their answer) already stated'),
+    ('team-decisions asks her directly via', 'team-decisions asks them directly via'),
+    ('`AskUserQuestion` instead of guessing, and her answer gets the plain',
+     '`AskUserQuestion` instead of guessing, and their answer gets the plain'),
+    ('with `Decided by` naming her:', 'with `Decided by` naming them:'),
+    ('(via team-decisions)` for one she answered through Step 4.5.',
+     '(via team-decisions)` for one they answered through Step 4.5.'),
+    ('a tie-break rule that re-applies a signal she said no to as the',
+     'a tie-break rule that re-applies a signal they said no to as the'),
 ]
 
 PERSONAL = ('Sara', '/Users/sara', 'CODE-LOCAL')
@@ -82,6 +113,14 @@ PERSONAL = ('Sara', '/Users/sara', 'CODE-LOCAL')
 def sanitize(text):
     for a, b in SANITIZE:
         text = text.replace(a, b)
+    # Any literal "Sara" surviving the phrase-level rewrites above is still a
+    # personalization to catch, not a special case. Compound adjectives and
+    # possessives go first so the article/hyphen come out right; YAML's
+    # doubled-apostrophe escaping (''s) is handled before the plain 's form.
+    text = re.sub(r"\bSara-", 'user-', text)
+    text = re.sub(r"\bSara''s\b", "the user''s", text)
+    text = re.sub(r"\bSara's\b", "the user's", text)
+    text = re.sub(r"\bSara\b", 'the user', text)
     return text
 
 def add_banner(text):
@@ -144,7 +183,7 @@ def main():
             continue
         dst_dir = f'{TK}/{tk_rel}'
         for root, dirs, files in os.walk(src_dir):
-            dirs[:] = [d for d in dirs if d not in ('memory', '.git', 'audit', 'config')]
+            dirs[:] = [d for d in dirs if d not in ('memory', '.git', 'audit', 'config', '__pycache__')]
             for f in files:
                 if f.startswith('.'):
                     continue

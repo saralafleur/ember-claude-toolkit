@@ -12,6 +12,9 @@ them with a clear decision.
 
 ## Inputs (read these)
 - `<output-dir>/request-brief.md`
+- `<output-dir>/supporting/product-owner.md` (if present) — the acceptance
+  criteria and scope verdict; your Definition of Done must cover the PO's
+  acceptance criteria, not just QA's test list.
 - `<output-dir>/supporting/architect.md`
 - `<output-dir>/supporting/engineer.md`
 - `<output-dir>/supporting/qa.md`
@@ -46,8 +49,23 @@ Write `<output-dir>/technical-plan.md` — the engineering deliverable:
    sentence in this section is how a declined-scope item turns into a live
    incident later — carry forward anything the Architect already flagged
    this way (see `architect.md`'s own Architectural risks note) rather than
-   letting it get dropped at synthesis.
+   letting it get dropped at synthesis. **Do not write
+   `decisions.md` yourself — your toolset can only rewrite the file whole,
+   which would clobber other steps' entries. Instead, return the row's
+   full content (id, title, status, question, context, options,
+   recommendation) in your final summary; the orchestrator appends it via
+   `add_decision.py` and you cite the id here.**
 8. **Definition of Done** — the checklist the implementer must satisfy.
+   **This checklist doubles as the plan's acceptance criteria** — in a
+   `fast` build, `build-test-author` derives its smoke assertions directly
+   from these items, so each must be a concrete, observable behavior, not
+   a process step.
+
+> **Consumer contract — section names are load-bearing.** `build-triage`,
+> `build-planner`, `build-test-author`, and `qa-triage` locate "Change
+> set", "Implementation steps", "Testing & verification", and "Definition
+> of Done" by heading text. Renaming or dropping a section silently breaks
+> those agents — keep the template's headings exactly.
 
 Keep it prescriptive — one path, not a menu. This plan should be detailed
 enough that an implementing agent (or engineer) can execute it without

@@ -30,10 +30,16 @@ replace it.
   matches a known recurring-defect pattern.
 - Every agent in the roster is a candidate to skip **except**:
   - the skill's own intake/triage-and-gate agent — something still has to
-    return a verdict before anything else runs, even a thin one, and
+    return a verdict before anything else runs, even a thin one,
   - the skill's own lead/synthesizer agent — something still has to produce
     the one coherent output doc that downstream skills and `team-status`
-    read.
+    read, and
+  - the skill's own memory-owner/PM agent, if it has one (`team-intake`'s
+    `intake-project-manager`) — it writes the artifacts the skill promises
+    on every run (pm-plan, ledger rows) and performs the `DECIDED-AUTO`
+    self-consistency audit, the one internal check on autonomous
+    decisions. Skipping it breaks the skill's own "every artifact still
+    written" guarantee.
 - Skip an evaluator only when its whole angle is clearly inapplicable to this
   specific change — a one-file copy-text fix has no real architecture
   decision, so an architect-role agent is skippable; a change to a public

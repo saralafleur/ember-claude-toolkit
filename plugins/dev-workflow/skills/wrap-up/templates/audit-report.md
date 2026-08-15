@@ -7,13 +7,25 @@ they're what makes a per-group decision possible instead of one blanket
 proceed/hold-off.
 -->
 
+<!--
+create-skill-devops (SKILL.md, its status command) mirrors this
+orientation table's column headers — keep the two in sync.
+-->
+
 # Wrap-up audit — <repo or project name>
 
 ## Worktree & branch status
 
 One row per repo/worktree in scope (Step 0). This is the orientation table —
 it's what tells you whether there's even a branch to merge, or whether
-this is direct-on-default work like a plain commit+push.
+this is direct-on-default work like a plain commit+push. **If the
+`worktree` skill is installed, don't hand-build it**: paste the table
+Step 1's
+`python3 ~/.claude/skills/worktree/scripts/worktree_status.py --table`
+run already emitted (same information, script-accurate). **If `worktree`
+isn't installed,** build this table by hand from plain `git status
+--porcelain` / `git rev-list --count` / `git worktree list` / `git
+merge-base --is-ancestor` per repo — see Step 1 item 1's fallback.
 
 | Location | Branch | vs `origin` | Working tree | Merged into default? |
 |---|---|---|---|---|
@@ -45,8 +57,11 @@ sections, and anything flagged earlier in the conversation as deferred.
 
 ## Orphaned effort directories
 
-Only render if Step 6's sweep found candidates (empty + unregistered with
-`git worktree list`). Lead the `What this means` column with plain language,
+Only render if Step 1 item 5's read-only orphan preview
+(`scripts/orphan_sweep.py`) found candidates (empty + unregistered with
+`git worktree list`) — the detection runs at Step 1 so this section is
+fillable when the report renders; Step 6 makes the actual delete decision
+behind its own gate. Lead the `What this means` column with plain language,
 not git jargon — "already merged but not deleted" or "looks unused/
 abandoned," not "orphaned"/"unregistered." Keep the mechanism (empty? in
 `git worktree list`?) as backup detail for if the user asks, not the headline.

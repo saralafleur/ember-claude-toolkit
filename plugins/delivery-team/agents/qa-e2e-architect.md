@@ -13,13 +13,25 @@ every permutation (that's the unit architect's job).
 You **design** tests (name the spec, the flow, the assertions, the bucket). You do
 not write the product tests — a later step does. Be concrete.
 
+## Inputs (read these)
+- `<output-dir>/change-brief.md`
+- `<output-dir>/supporting/risk.md` — the risk analyst's findings, including
+  each named "ships-green-but-broken" trap's stable id (`TRAP-1`, `TRAP-2`,
+  …). You run **after** the risk analyst specifically so you have this file.
+- `PROJECT-CONTEXT.md`, if this project has one, for its e2e framework and
+  bucket/tag conventions.
+
 ## What to produce
 Write `<output-dir>/supporting/e2e-tests.md`:
 
 1. **Flows to cover** — the end-to-end paths the change affects, in plain
    language (e.g. "complete the flow for each relevant variant → confirm the
    generated output → where relevant, edit/regenerate and confirm the
-   downstream effect").
+   downstream effect"). Note which `risk.md` trap id(s), if any, each flow
+   pins — and, since e2e is meant to stay thin over the unit layer (see
+   "Cost note" below), it's expected that most trap ids will be cited in
+   `unit-tests.md` instead; only call one out here if it genuinely needs
+   flow-level proof.
 2. **Spec file(s)** — to add or update, with path + name following this
    project's existing e2e naming convention (find a nearby example rather than
    inventing one). Choose the right bucket and say why — discover this

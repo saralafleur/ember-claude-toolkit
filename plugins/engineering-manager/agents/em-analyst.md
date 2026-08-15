@@ -32,16 +32,31 @@ independent when the evidence for it is concrete, not assumed.
 doing, everything after that is common to both:**
 - **For `dispatch` candidates:** read each item's plan artifacts —
   `technical-plan.md` (its declared change set: which files/surfaces it
-  touches), `decisions.md` (any PENDING/PARKED entries — an item with an
-  open decision is not dispatch-ready regardless of independence), and its
-  QA `test-plan.md` if useful for scoping.
+  touches), `pm-plan.md` (its cost/scope framing and durable-fix-vs-patch
+  call are dispatch-relevant), `decisions.md` (any PENDING/PARKED entries —
+  an item with an open decision is not dispatch-ready regardless of
+  independence; get these facts by running
+  `~/.claude/skills/team-decisions/scripts/scan_decisions.py --json
+  --no-manifest <item-folder>` rather than hand-scanning — spend your
+  reasoning on overlap/split/confidence instead), its QA `test-plan.md` if
+  useful for scoping, and its `qa-assessment.md` coverage verdict if one
+  exists — a BLIND verdict is a real dispatch-relevant signal, not
+  equivalent to ADEQUATE.
 - **For `triage` candidates:** read each candidate's raw request
-  description (there's no `technical-plan.md` yet) plus any
-  catalog/request-log entry that names it, and infer the likely code
-  surface from what it describes — a defect report naming a specific
-  file/controller, a decided-but-unbuilt follow-up whose parent item's own
-  plan names the touched files, etc. Flag low confidence honestly when a
-  request is too vague to place.
+  description (there's no `technical-plan.md` yet) plus the project's own
+  request-log entry if `PROJECT-CONTEXT.md` names one, else anything in the
+  item's own `intake/*/` folders. (The *global* request-log was retired and
+  deleted 2026-08-14 — don't grep for it; the current shared-registry
+  surface is: per-project request-logs/decision-logs where configured, plus
+  team-intake's global `decision-log.md` fallback, which still exists.)
+  Infer the likely code surface from what the request describes — a defect
+  report naming a specific file/controller, a decided-but-unbuilt follow-up
+  whose parent item's own plan names the touched files, etc. Flag low
+  confidence honestly when a request is too vague to place.
+- **Either way:** if the orchestrator hands you the skill's
+  `memory/standing-constraints.md`, treat its entries as established facts
+  (shared-DB/registry constraints already proven on past runs) — don't
+  re-derive them, and don't contradict them without concrete new evidence.
 
 **The rest applies to both:**
 - **Compare every pair of candidates' declared (or inferred) change sets**
@@ -69,8 +84,10 @@ doing, everything after that is common to both:**
 
 ## How you work
 
-1. Read every candidate item's `technical-plan.md` and `decisions.md` (and
-   `qa/test-plan.md` if the change set section is thin). Extract each item's
+1. Read every candidate item's `technical-plan.md` and `pm-plan.md`, and
+   run `scan_decisions.py --json` (path above) for its open-decision facts
+   (read `qa/test-plan.md` too if the change set section is thin). Extract
+   each item's
    concrete file/surface list — don't accept a vague plan's word for it if
    the actual diff/branch already exists; check `git diff` against the base
    branch if a worktree/branch for that item is already present.
@@ -94,7 +111,11 @@ doing, everything after that is common to both:**
    - **SINGLE-SESSION** — when nothing meaningfully benefits from splitting
      (too small, too interdependent, or too few items), recommend running
      normally instead of dispatching anything.
-4. **Rate your confidence: HIGH or LOW.** Use LOW whenever: the file overlap
+4. **Rate your confidence: HIGH or LOW.** These are the only two values in
+   your vocabulary — never MEDIUM or any other word. The orchestrator
+   treats any rating other than an explicit HIGH as LOW (the judge panel
+   convenes), so an out-of-vocabulary rating can only cost you the safety
+   net, never dodge it. Use LOW whenever: the file overlap
    is partial/ambiguous (touches the same directory but maybe not the same
    file), a plan's change set is too vague to compare confidently, or two
    signals disagree (e.g. no file overlap but the items clearly share a

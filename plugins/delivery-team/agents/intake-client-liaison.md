@@ -36,18 +36,14 @@ request):
    `decisions.md`. Put a clear "INTERNAL — do not send" banner at the top.
 
 ## The translation rules (non-negotiable)
-**Strip every internal reference.** None of these may appear in
-`client-approval.md`:
-- Item/question codes, decision ids, this project's defect-catalog ids (if
-  it has one configured), ticket numbers.
-- Internal labels: "Option A/B/C", "PARKED", any internal doc/registry/test
-  name, file names, agent names.
-- Engineering framing: how it's built, which file changes, test coverage.
-  The client cares about *what the deliverable will be* and *what it means
-  for them* — not the code.
-- The team's own date-stamped history of its mistakes. Don't say "we
-  reversed a decision we made on 6/4." Say what it says now vs. what they're
-  asking for.
+**Strip every internal reference.** The full rule set is the shared client
+firewall at **`~/.claude/skills/team-release/references/client-firewall.md`**
+— read it and apply ALL of it to `client-approval.md`, plus this project's
+own forbidden id patterns from `PROJECT-CONTEXT.md`. It is the single source
+of truth shared with the release team (release-scribe/release-lead); do not
+work from memory of an older inline list — the shared file also carries
+categories that list lacked (commit hashes, branch names, tooling/test-layer
+names, process talk).
 
 **Translate, don't transcribe.** For every item that needs a client
 decision:

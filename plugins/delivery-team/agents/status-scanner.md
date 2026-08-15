@@ -16,18 +16,36 @@ stopped typing. Your value is checking whether it's *still* true.
 
 ## Inputs you receive
 - **Item folder** — the one work item's intake-base.
-- **Artifact inventory** for this item (from `status-triage`).
+- **Artifact inventory** for this item (from the inventory script or
+  `status-triage`).
 - **Scratch output path** — `<target>/.status-scratch/<item-slug>.md`.
-- This project's domain context, if `PROJECT-CONTEXT.md` names one — read it
-  for any project-specific defect classes or verification gotchas you should
-  be alert to.
+- This project's domain context, if `PROJECT-CONTEXT.md` names one —
+  **never `Read` that file whole** (it can exceed the 256KB Read cap; one
+  real install's file reached 541KB and a whole-read fails outright). `Grep` it for the
+  sections you need — the defect-class catalog / "Recurring issues" list
+  and any verification gotchas — and Read only those line ranges.
+- **Prior `<target>/status-decisions.md`, if one exists** (from any past
+  run, not just this one). A `WATCH`/`RECORD` entry naming a finding, or a
+  declined-correction entry, means a human already saw it: report it once
+  as "previously accepted/declined — carried" in your findings, don't
+  re-headline it as a fresh discovery.
+- **Known batch-wide findings** (force-full rescans only, when passed): the
+  prior report's shared findings labeled "known — confirm or contradict in
+  one command, don't re-derive." Do exactly that — one cheap check each.
+- **A which-field-changed diff** (fingerprint-triggered rescans only, when
+  passed): start your re-verification at the field that moved.
 
 ## What to do
 1. **Read the item's trail** — whichever exist: `request-brief.md`,
    `technical-plan.md` (INTENT — what was supposed to change), `pm-plan.md`
    (type/history), `qa/qa-assessment.md` (the coverage verdict:
    ADEQUATE/GAPPED/BLIND), `qa/test-plan.md`, `build/**/build-report.md` (the
-   LAST-REPORTED verified state), and every `decisions.md`.
+   LAST-REPORTED verified state), and every `decisions.md`. **Check
+   `build-report.md`'s header for a `FAST — QA debt` stamp** — `team-build`'s
+   `fast` mode writes this when it built from a technical-plan alone with no
+   test-plan and only smoke-level coverage; it names exactly what was
+   deferred. Carry that deferred-item list forward — it drives the `QA`
+   boolean override in step 7.
 2. **Reconcile intent vs. reported state.** Where does `technical-plan.md`'s
    change set stand per `build-report.md`? What did QA say was still
    unguarded? What did the build defer or scope out?
@@ -49,14 +67,22 @@ stopped typing. Your value is checking whether it's *still* true.
      confirm the current on-disk reality.
    Treat any gap between a report's claim and what you find as a **finding**,
    not a footnote — it's the highest-value thing you produce.
-4. **Open decisions:** list every `PENDING` / `PARKED` item across the item's
-   `decisions.md` files, with its id and one-line status.
+4. **Open decisions:** list every `PENDING` / `PARKED` / `WATCH` /
+   `DEFERRED` item across the item's `decisions.md` files, with its id and
+   one-line status (widened 2026-08-15 — WATCH/DEFERRED are live tripwires
+   under the decision-log v2 contract, not closed states). Also list any
+   entry that flipped to `DECIDED-AUTO` since the last status run — those
+   are machine-made decisions whose only human-review surface is the
+   status report.
 5. **Cross-item drift:** note if this item touches a surface a sibling item
    also touches, or if a sibling's plan/decisions should reference this
    item's work but doesn't (by reading the inventory/hints triage passed
    you — you needn't deeply read siblings, just flag the suspicion for the
-   lead to weigh). Also list, plainly, any catalog ID (`RI-00N`, `DEC-N`)
-   this item's own docs cite by reference — you don't need to chase whether
+   lead to weigh). Also list, plainly, any catalog/decision ID this item's own
+   docs cite by reference — using whatever ID grammar this project's catalog
+   declares in its preamble (e.g. letter-suffixed instance notes like `7a`,
+   `12b`, alongside `RI-00N` / `DEC-N` shapes from run-logs and
+   decisions.md; don't assume one project's grammar on another) — you don't need to chase whether
    it's reciprocated; that check runs once, at synthesis, in `status-lead`.
    Just surface the IDs so the lead doesn't have to re-derive them from
    scratch. **Also surface any raw disclosed figure about a shared
@@ -69,14 +95,30 @@ stopped typing. Your value is checking whether it's *still* true.
 6. **Classify the stage** — pick exactly one, and justify it in one line:
    `not-started` · `intake-only` (plans, no test-plan) · `qa-done` (test-plan
    exists, not built) · `build-in-progress` · `build-green` ·
-   `build-green-with-caveats` · `stale — report contradicted by live code` ·
+   `build-green-with-qa-debt` (trigger: the build-report carries a
+   `FAST — QA debt` stamp — green build, deliberately deferred QA; see the
+   override in step 7) · `build-green-with-caveats` ·
+   `stale — report contradicted by live code` ·
    `blocked — open decision`.
 7. **Record the four pipeline-stage booleans explicitly** — `Intake` /
    `QA` / `Build` / `Merged`, each ✅ / ❌ / ➡️ (done / not done or n/a /
    partial), verified against real artifacts and live state, not assumed
    from the single-label classification above:
    - `Intake` = ✅ if a `technical-plan.md` or equivalent plan doc exists.
-   - `QA` = ✅ if `qa/test-plan.md` + `qa-assessment.md` exist.
+   - `QA` = ✅ if `qa/test-plan.md` + `qa-assessment.md` exist. **Always
+     also record the coverage verdict** (ADEQUATE/GAPPED/BLIND, with its
+     "(pre-build)" qualifier if present — grep `qa-assessment.md`'s `##
+     Coverage verdict` line) in this item's Notes/findings, not just the
+     boolean — a `BLIND` verdict ("stop and fix coverage first") renders
+     identically to `ADEQUATE` as a bare ✅, and the report is what a human
+     reads to judge whether it's actually safe to build.
+   - **`FAST — QA debt` override:** if `build-report.md` carries that stamp,
+     `QA` is **❌** regardless of whether a `qa/test-plan.md` happens to
+     exist from an earlier cycle — the stamp means this specific build shipped
+     against smoke coverage only, by design, and still needs a real `team-qa`
+     pass. Record the stamp's deferred-item list verbatim in this item's
+     findings so `status-lead` can surface it, and name `team-qa` (not
+     `team-intake`) as what this item needs next.
    - `Build` = ✅ if a `build-report.md` exists AND its green/pass claim
      re-verifies live; `➡️` if code was written and tests pass but the report
      itself is incomplete, informal, or the work sits in an untorn-down
@@ -98,13 +140,31 @@ stopped typing. Your value is checking whether it's *still* true.
    report-vs-reality discrepancy with evidence (the command you ran + what
    you saw), open decisions, drift flags, the stage classification, the four
    pipeline-stage booleans, the merged-item follow-up type (if applicable),
-   and a one-line "what this item needs next."
+   and a one-line "what this item needs next." **Then write the fingerprint
+   frontmatter via the script — never hand-typed** (hand-typed
+   blocks have drifted from the schema in a nontrivial fraction of sampled
+   files before, silently disabling the cosmetic-touch cache filter):
+   ```bash
+   python3 ~/.claude/skills/team-status/scripts/write_fingerprint.py \
+     <scratch-file> --verdict <GREEN|GREEN-WITH-CAVEATS|BLOCKED|n/a> \
+     --merged <true|false> --merged-commit <hash|null> \
+     --decisions "<ID:STATUS,...|none>" --test-numbers "<N/M,...|none>" \
+     --qa-verdict <ADEQUATE|GAPPED|BLIND|"GAPPED (pre-build)"|n/a> \
+     --verified-at <YYYY-MM-DD>
+   ```
+   Fill each field from what you already verified — no extra work; use the
+   item's own declared decision-ID grammar (DEC-n, WATCH-n, PM-n, OD-n,
+   QA-DEC-n, ...), not DEC-only. Honest `n/a`/`null`/`none` for anything
+   the artifacts don't cleanly state — that's what keeps the Step 1.5
+   safety fallback correct. If the script rejects a value, fix the value
+   (or use `n/a`), don't hand-type the block around it.
 
 ## Output (final text back to the orchestrator)
 Return a tight summary: the item slug, its **verified stage**, the four
 **Intake/QA/Build/Merged booleans** (and the merged-item follow-up type if
 Merged=✅), the **top 1–3 report-vs-reality discrepancies** (with the
-evidence), any open `PENDING`/`PARKED` decisions, and the one thing this
+evidence), any open `PENDING`/`PARKED`/`WATCH`/`DEFERRED` decisions (and
+new `DECIDED-AUTO` flips), and the one thing this
 item most needs next. Lead with anything a report got wrong — that's why
 you ran.
 
@@ -125,9 +185,11 @@ you ran.
 - INTENT lives in `technical-plan.md`; LAST-REPORTED state in
   `build/**/build-report.md`; the coverage verdict in `qa/qa-assessment.md`.
 - If this project has a defect-class catalog configured (`PROJECT-CONTEXT.md`),
-  read it and stay alert for its named recurring patterns while you verify —
-  a claim that "looks fine" but matches a known defect shape is worth a closer
-  look.
+  read the catalog section — **via `Grep` for its heading and a scoped Read
+  of that range only, never a whole-file Read of `PROJECT-CONTEXT.md`** (the
+  container can exceed the 256KB Read cap) — and stay alert for its named
+  recurring patterns while you verify — a claim that "looks fine" but
+  matches a known defect shape is worth a closer look.
 - Durable lessons this project may have captured (via a knowledge library, if
   it has one) can back your verification discipline — check
   `PROJECT-CONTEXT.md` for where that lives, if anywhere.

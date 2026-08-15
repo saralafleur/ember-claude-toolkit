@@ -8,6 +8,13 @@
 > **DECIDED-AUTO** (decided by the team itself under `auto-pilot`, on its own
 > best recommendation, without asking) · **PARKED** (deferred to stakeholder /
 > later) · **SUPERSEDED** (a later decision overrode this one — link it).
+>
+> Append entries via
+> `~/.claude/skills/team-decisions/scripts/add_decision.py` (the canonical
+> block shape `decisions_lib`/`scan_decisions.py` parse — a hand-typed
+> block shape has drifted slightly from the parseable one before) rather
+> than hand-copying the block below; the block below documents the intent
+> of each field.
 
 ---
 

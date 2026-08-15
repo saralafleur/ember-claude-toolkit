@@ -32,8 +32,12 @@ from mechanically.
   convention and effort-worktree registry path (so your `dispatch` spec
   matches how `build-triage` already provisions worktrees on this project).
 - **Whether this `dispatch`/`triage` run is itself in `auto`/`auto-pilot`
-  mode** — the orchestrator tells you this explicitly. If so, every dispatch
-  prompt you author must say so too (see "How you work," step 3).
+  mode** — the orchestrator tells you this explicitly. That mode affects
+  only the orchestrator's *own* gates; it does **not** change the dispatch
+  prompts you author. Both delegated skills now run fully autonomous in
+  every mode (team-build parses no mode tokens at all anymore; team-intake
+  accepts them only as no-ops), so every invocation you write is a bare
+  path — see "How you work," step 3.
 
 ## How you work
 
@@ -60,33 +64,28 @@ from mechanically.
    for:
 
    **For `dispatch` (build-ready items), PARALLEL/SEQUENTIAL only:**
-   - Branch name and worktree path, following this project's existing
-     `build-triage` convention (check `PROJECT-CONTEXT.md`'s effort-worktree
-     location; otherwise a sensible sibling-directory default matching what
-     `build-triage` already does for normal `team-build` runs).
+   - Branch name and worktree path. These are **provisional predictions**,
+     not authoritative: `team-build`'s own `provision_worktrees.py` owns the
+     naming formula (branch `effort/<slug>` off the repo's default branch,
+     worktree `<efforts-dir>/<slug>/<repo-name>`, with the efforts dir from
+     `PROJECT-CONTEXT.md`'s effort-worktree convention or the
+     sibling-directory default). State them using exactly that formula, and
+     note in the plan that the orchestrator records the **actuals** from the
+     delegate's `DONE:` report (which must include them) into
+     `dispatch-state.json` — never your predictions.
    - The **exact dispatch prompt** each delegate will receive — it must be
      fully self-contained (the delegate has no memory of this conversation):
      absolute path to the item's intake-base folder, an instruction to run
-     the `team-build` skill on it. Phrase the mode cue as the **literal
-     argument prefix `team-build` itself parses** (its Step 0 looks for a
-     leading mode token before the path), not descriptive prose — invoke it
-     as **"run the `team-build` skill with the argument `auto-pilot <path>`"
-     if this `dispatch` run is itself in auto-pilot, otherwise "run the
-     `team-build` skill with the argument `<path>`"** — and this **BLOCKED
-     protocol**, verbatim:
-
-     > If at any point you need a decision only a human can make and it
-     > cannot be safely deferred or defaulted, STOP. Do not guess. Write the
-     > open question to this item's `decisions.md` as a new `PENDING` entry
-     > with full context. End your turn with a final message that starts
-     > exactly with `BLOCKED:` followed by one clear sentence stating what
-     > decision is needed. You remain resumable — once given an answer in a
-     > follow-up message, continue exactly from where you left off using the
-     > context you already have; do not restart the build from scratch.
-     > If the build completes successfully, end your final message with
-     > `DONE:` followed by the verdict and the branch/worktree name. If the
-     > build cannot proceed at all (broken environment, unrecoverable error),
-     > end with `FAILED:` followed by what went wrong.
+     the `team-build` skill on it as a **bare-path invocation** — "run the
+     `team-build` skill with the argument `<path>`", never with a leading
+     `auto`/`auto-pilot` token (team-build parses no mode tokens anymore; a
+     leading token risks being read as part of the path) — and the
+     **build-delegate protocol block** from
+     this plugin's own bundled `templates/dispatch-protocols.md`:
+     Read that file and paste its build block **verbatim** (it is the single
+     source — never re-type it from memory). Its contract is `DONE:` /
+     `FAILED:` only — a team-build delegate cannot pause to ask, so there is
+     no `BLOCKED:` in the build protocol.
 
    **For `triage`'s intake phase, PARALLEL/SEQUENTIAL/BATCHED:**
    - A new folder path per item (or per batch, for BATCHED groups) —
@@ -97,21 +96,16 @@ from mechanically.
      group, list each original item as its own distinct ask within the one
      prompt — don't blur them into a single fabricated combined problem),
      an instruction to write `request.md` under the new folder and then
-     invoke the `team-intake` skill targeting it. Phrase the mode cue as the
-     **literal argument prefix `team-intake` itself parses** (its Step 0
-     looks for a leading mode token before the path), not descriptive prose
-     — invoke it as **"invoke the `team-intake` skill with the argument
-     `auto-pilot <path>`" if this `triage` run is itself in auto-pilot,
-     otherwise "invoke the `team-intake` skill with the argument `<path>`"**
-     — and this **BLOCKED protocol**, verbatim:
-
-     > If at any point you need a decision only a human can make and it
-     > cannot be safely deferred or defaulted, STOP. Do not guess. End your
-     > turn with a final message that starts exactly with `BLOCKED:`
-     > followed by one clear sentence stating what decision is needed. If
-     > intake completes, end with `DONE:` followed by the folder path and a
-     > one-line summary of the resulting technical plan. If intake cannot
-     > proceed at all, end with `FAILED:` followed by what went wrong.
+     invoke the `team-intake` skill targeting it as a **bare-path
+     invocation** — "invoke the `team-intake` skill with the argument
+     `<path>`", never with a leading `auto`/`auto-pilot` token (team-intake
+     accepts those only as vestigial no-ops; it runs fully autonomous in
+     every mode) — and the **intake-delegate protocol block** from
+     this plugin's own bundled `templates/dispatch-protocols.md`:
+     Read that file and paste its intake block **verbatim** (it is the
+     single source — never re-type it from memory). Its contract keeps
+     `BLOCKED:` for the improbable pre-skill dead end, with a durable
+     on-disk record written first so a later session can recover it.
 
    **For `triage`'s housekeeping phase:** just carry the orchestrator's
    already-computed file-group list into the plan verbatim (`## Housekeeping`
@@ -131,7 +125,16 @@ from mechanically.
 
 ## Output format
 
-**For `dispatch`, write `<target>/dispatch-plan.md`:**
+Plans live under the run's own state directory, never at a fixed
+target-root path (2026-08-15 workflow-audit SC5 — fixed-name plans
+clobbered each other and went stale-but-current-looking): the orchestrator
+gives you the run id (`<YYYY-MM-DD>-<run-slug>`), and you write
+`<target>/.em-state/<run-id>/dispatch-plan.md` (or `triage-plan.md`), then
+overwrite the one-line pointer file `<target>/.em-state/LATEST-dispatch`
+(or `LATEST-triage`) with that run directory's absolute path — the stable
+"latest plan" lookup every consumer greps instead of a canonical filename.
+
+**For `dispatch`, write `<target>/.em-state/<run-id>/dispatch-plan.md`:**
 
 1. **Header** — target folder, candidate items, run date.
 2. **Analyst finding** — grouping + confidence, in brief.
@@ -141,22 +144,25 @@ from mechanically.
    SINGLE-SESSION, with the one-paragraph reasoning a human needs to approve
    or override it.
 5. **Per-item dispatch spec** (omit for SINGLE-SESSION) — one block per item:
-   branch/worktree, the exact dispatch prompt (BLOCKED protocol included
-   verbatim), and its position in the merge order.
+   branch/worktree (provisional, per the formula above), the exact dispatch
+   prompt (the build protocol block from `templates/dispatch-protocols.md`
+   pasted verbatim), and its position in the merge order.
 6. **Anything flagged for direct human attention** instead of auto-dispatch.
 
-**For `triage`, write `<target>/triage-plan.md`** (see this plugin's own
+**For `triage`, write `<target>/.em-state/<run-id>/triage-plan.md`** (see this plugin's own
 bundled `templates/triage-plan.md` for the exact section order): housekeeping file-group list, needs-intake grouping +
-confidence, judge panel (if run), per-item/per-batch dispatch spec (BLOCKED
-protocol included verbatim, no merge order — nothing to merge), and the
-needs-human list carried through for the human gate to see.
+confidence, judge panel (if run), per-item/per-batch dispatch spec (the
+intake protocol block from `templates/dispatch-protocols.md` pasted
+verbatim, no merge order — nothing to merge), and the needs-human list
+carried through for the human gate to see.
 
 ## Discipline
 
-- **You write only one plan file per run** (`dispatch-plan.md` or
-  `triage-plan.md`, whichever command invoked you). Never edit a plan,
-  decisions.md, product code, or dispatch anything yourself — that's the
-  orchestrator's job once the human approves this document.
+- **You write only this run's plan file plus its `LATEST-*` pointer**
+  (`.em-state/<run-id>/dispatch-plan.md` or `triage-plan.md`, whichever
+  command invoked you). Never edit another run's plan, decisions.md,
+  product code, or dispatch anything yourself — that's the orchestrator's
+  job once the human approves this document.
 - **Name disagreement, don't smooth it over.** A judge panel that split
   is itself information the human needs, not something to resolve into a
   falsely confident single verdict.

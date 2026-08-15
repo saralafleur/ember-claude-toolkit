@@ -14,6 +14,18 @@ You **design** tests (name the spec, the cases, the exact assertions). You do
 not write the product tests — a later implementation step does. Be concrete
 enough that the implementer writes them without re-deriving anything.
 
+## Inputs (read these)
+- `<output-dir>/change-brief.md`
+- `<output-dir>/supporting/risk.md` — the risk analyst's findings, including
+  each named "ships-green-but-broken" trap's stable id (`TRAP-1`, `TRAP-2`,
+  …). You run **after** the risk analyst specifically so you have this file;
+  do not independently re-derive risk/invariant reasoning from the change
+  brief alone — that duplicated the analyst's work and let traps fall
+  through in real runs before this sequencing existed (see qa-lead's
+  reconciliation step, which diffs trap ids against what you cite here).
+- `PROJECT-CONTEXT.md`, if this project has one, for its unit/component
+  test stack and canonical source-of-truth docs.
+
 ## What to produce
 Write `<output-dir>/supporting/unit-tests.md`:
 
@@ -35,17 +47,22 @@ Write `<output-dir>/supporting/unit-tests.md`:
      list/registry this project has, require a corresponding test case for it;
      where feasible, recommend a registry-derived meta-test so an omitted
      entry can't ship green.
-2. **Round-trip / boundary surfaces** — for anything persisted or crossing a
+2. **Trap coverage** — for each `risk.md` trap id you're pinning with a test
+   in this doc, cite its id next to the assertion (e.g. "TRAP-2 — …"). At the
+   end of this section, list any `risk.md` trap ids **not** cited anywhere in
+   this doc, so `qa-lead` and the e2e architect can see what's uncovered
+   here without re-deriving it.
+4. **Round-trip / boundary surfaces** — for anything persisted or crossing a
    serialization boundary: a round-trip test asserting every field survives
    Create→Get *and* Update→Get (or this project's equivalent write/read
    cycle); for anything with an unresolved-placeholder risk: a
    no-unresolved-token assertion at both the point it's produced and the
    point it's finally consumed/sent.
-3. **Test data / fixtures** — what input state drives each test; reuse
+5. **Test data / fixtures** — what input state drives each test; reuse
    existing fixtures where they exist.
-4. **How to run** — the exact commands, from `PROJECT-CONTEXT.md` if
+6. **How to run** — the exact commands, from `PROJECT-CONTEXT.md` if
    configured, else discovered from the project's build config.
-5. **Red-first note** — for each new test, state what it should assert such that it
+7. **Red-first note** — for each new test, state what it should assert such that it
    **fails before the change/fix and passes after** — proving it actually guards the
    behavior, not just that it runs.
 

@@ -1,8 +1,13 @@
 <!--
   CLIENT-FACING release notes. This is the document the client reads.
   NOTHING internal may appear here: no item codes, defect-catalog ids, decision
-  ids, file paths, commit hashes, test names, or process/tooling words. All of
-  that goes in release-crosswalk.md. Delete this comment before finalizing.
+  ids, file paths, commit hashes, test names, or process/tooling words (full
+  rule set: ~/.claude/skills/team-release/references/client-firewall.md). All
+  of that goes in release-crosswalk.md.
+
+  The heading grammar below — sections grouped by AREAS THE CLIENT RECOGNIZES
+  — is the standard; seed every draft from this file's heading grammar.
+  Delete this comment before finalizing.
 -->
 
 # What's New — <Product / Portal name> <version>

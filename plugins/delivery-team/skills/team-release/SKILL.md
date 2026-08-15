@@ -58,7 +58,7 @@ modes change that, and compose in either order:
 
 | Mode | Token(s) | What changes |
 |---|---|---|
-| Auto-pilot | `auto-pilot`, alias `auto` | Every gate in "Process" is tagged **PREFERENCE**, **QUALITY**, or **SHIP**. PREFERENCE gates no longer stop — the team decides on its own best recommendation, logs the choice to `decisions.md` as `DECIDED-AUTO`, and keeps going. The QUALITY gate (a client claim no commit supports) still stops, in every mode — a factual problem isn't something to auto-decide past. **The SHIP gate proceeds too** (Step 4): auto-pilot finalizes the notes and reports them ready rather than asking. This changes nothing about what the skill can actually *do* — it already never transmits anything itself (see the note above); "proceeds" just means it stops blocking on the question. |
+| Auto-pilot | `auto-pilot`, alias `auto` | Every gate in "Process" is tagged **PREFERENCE**, **QUALITY**, or **SHIP**. PREFERENCE gates no longer stop — the team decides on its own best recommendation, logs the choice to `decisions.md` as `DECIDED-AUTO`, and keeps going. The QUALITY rule (a client claim no commit supports) **binds in every mode** — it is a repair mandate, not a stop-and-wait gate: the lead repairs or cuts the claim (or sends it back to the scribe for redraft); a false claim never ships, and every repair/cut is reported explicitly at the SHIP gate (see Step 3). **The SHIP gate proceeds too** (Step 4): auto-pilot finalizes the notes and reports them ready rather than asking. This changes nothing about what the skill can actually *do* — it already never transmits anything itself (see the note above); "proceeds" just means it stops blocking on the question. |
 | Direct | `direct` | Accepted for consistency with the rest of the suite, but this skill's own roster is already minimal — one drafter, one fact-checker, neither droppable (the scribe has nothing to check without a draft; the fact-check is the whole reason this skill exists). `director-of-engineering` is not invoked here; `direct` behaves the same as standard mode for agent selection. |
 
 ### Step 0 — Establish the release scope (what shipped in this version)
@@ -81,7 +81,17 @@ items.
   `PROJECT-CONTEXT.md`) unless the user names one.
 - Enumerate the **work items** in the release: each item's intake/build
   folder and its `build-report.md`. Confirm each item was actually built (a
-  green build-report), and gather the commit range per repo touched. If a
+  green build-report). **A `GREEN-WITH-CAVEATS` build-report qualifies** —
+  the item may release — but the caveat travels with it: the lead records it
+  in the crosswalk and surfaces it at the SHIP gate so client disclosure is
+  the user's call (Steps 3–4). Step 0's deliverable is the **item list +
+  artifact paths + green-build confirmation** — nothing more. You *may* pass
+  along a commit range per repo, but label it explicitly as a **hint**: the
+  release-lead re-derives the real range itself during fact-check (the one
+  time a handed-down range was checkable, it was wrong). Step 0's
+  scope/range resolution is judgment work — run it at the strong tier, or
+  explicitly treat its output as untrusted input the lead must re-derive
+  (the lead already behaves this way). If a
   recent `status-report.md` exists for this project (`team-status`'s output),
   check its "Ready for Deployment" table first — those items have already
   been independently re-verified as merged, so it's a faster starting point
@@ -93,10 +103,15 @@ items.
 
 🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧 — **PREFERENCE gate.**
 - Do not invent scope. If it's unclear which items belong to this version,
-  ask. **Under auto-pilot,** auto-decide instead: default to every build
-  since the release-log's last entry that doesn't yet have a release,
-  log the resulting item list to `decisions.md` as `DECIDED-AUTO`, and state
-  it plainly in the Step 4 report-back rather than asking.
+  ask. **Under auto-pilot,** auto-decide instead: default to every build not
+  yet covered by a version whose **latest release-log row is marked `SENT`**
+  (fall back to `CLEARED` if the project records clearance but not
+  transmission) — compute from the log's Status column, never from "the last
+  entry": the newest row may be a `HOLD` pass on a never-sent release. Hold
+  the auto-decision in memory and write it to `decisions.md` as
+  `DECIDED-AUTO` **at Step 1, once the release output folder exists** (the
+  folder isn't created until then), and state it plainly in the Step 4
+  report-back rather than asking.
 
 ### Step 1 — Set up the output location
 Check `PROJECT-CONTEXT.md` for this project's convention on where release
@@ -107,10 +122,13 @@ item's build folder — a release spans items.
 
 ### Step 2 — Draft the client notes
 Run `release-scribe` with the version, the item list + artifact paths, and
-the output dir. It reads every item's build-report / plan / decisions and
-writes:
+the output dir. It **seeds both documents from
+`~/.claude/skills/team-release/templates/`** (their structure is the
+standard, not a suggestion), reads every item's build-report / pm-plan /
+plan / decisions, and writes:
 - `release-notes.md` (client-facing draft)
-- `release-crosswalk.md` (private: each note → item/commit/decision)
+- `release-crosswalk.md` (private: each note → item/decision; the Commit(s)
+  column stays `—` — it is lead-owned, filled during Step 3 verification)
 
 ### Step 3 — Fact-check + finalize (gate)
 Run `release-lead`. It verifies every client-facing claim against the
@@ -119,17 +137,40 @@ shipped-but-omitted → add), sweeps `release-notes.md` for any leaked internal
 jargon (including this project's own defect-catalog/decision-id patterns, if
 `PROJECT-CONTEXT.md` names any), confirms the version/date, finalizes the
 notes, updates the crosswalk with its verification result per note, and
-appends a row to the release-log.
-- If the lead finds a client claim **no commit supports**, that's a
-  **QUALITY gate — stays in every mode, including auto-pilot.** The notes do
-  not ship with a false claim, ever; fix the wording or drop the line. There's
-  no "best recommendation" for a claim that isn't true.
+appends a row to the release-log — via
+`~/.claude/skills/team-release/scripts/append_release_log_row.py`, one row
+per lead pass, carrying a Status token (`HOLD — <reason>` / `CLEARED` /
+`SENT <date>`) and a crosswalk link (see release-lead.md for the row
+contract).
+- If the lead finds a client claim **no commit supports**, that's the
+  **QUALITY rule — binds in every mode, including auto-pilot.** The notes
+  never ship a false claim; there's no "best recommendation" for a claim
+  that isn't true. It operates as a **repair mandate, not a stop-and-wait
+  gate**: the lead fixes the wording or cuts the line itself, or **sends it
+  back** to the scribe for a targeted redraft when the fix is voice-level
+  (the lead→scribe→lead loop — a targeted redraft-and-reverify pass is the
+  established precedent here), then re-verifies. Every repair, cut, or send-back is reported
+  explicitly at the SHIP gate so the user sees exactly what was caught.
+- The lead **may reopen Step 0's scope decision** when its commit sweep
+  finds a shipped, unclaimed client-visible item: route the scope change
+  through the release folder's `decisions.md` (PENDING → ask the user;
+  `DECIDED-AUTO` under auto-pilot), never a silent expansion.
+- The lead also checks each bundled item's build-report for
+  `GREEN-WITH-CAVEATS` / QA-debt markers and records any in the crosswalk
+  for SHIP-gate disclosure (see release-lead.md, verification item 5).
 
 ### Step 4 — Report back
 Summarize for the user in chat:
 - The **version** and the **items** bundled into it.
 - The client-facing headline (2–3 lines of what the client will see).
-- Any claim the lead **cut or added** during fact-check, and why.
+- Any claim the lead **cut, added, repaired, or sent back** during
+  fact-check, and why (every QUALITY-rule catch is disclosed here — this is
+  the visibility half of the repair mandate).
+- Any **`GREEN-WITH-CAVEATS` / QA-debt caveat** on a bundled item — whether
+  and how to disclose it to the client is the user's call at the SHIP gate.
+- Any **"build-report claimed GREEN but commit unmerged/stale"** catch, and
+  confirmation it was recorded in the project's defect catalog (if one is
+  configured).
 - Confirmation the notes are **jargon-clean** and **version-correct**.
 - Links to `release-notes.md` (the deliverable) and `release-crosswalk.md`
   (internal).
@@ -142,6 +183,25 @@ Then ask whether the user wants to send the notes, edit them, or hold.
 to send instead of waiting — this skill still never transmits anything
 itself in any mode, so "proceeding" here just means not blocking on the
 question.
+
+### Re-entry passes (re-running a version already drafted)
+Most real releases take **more than one pass** — a SHIP-gate hold while a
+decision is pending, a late scope change, a redraft after the user answers.
+A re-entry pass is
+this same process with a different input contract, not a from-scratch rerun:
+- **Inputs:** the version's prior `release-crosswalk.md` and its prior
+  release-log row(s) — the latest row's Status token (`HOLD — <reason>` /
+  `CLEARED` / `SENT <date>`) is the state being resumed. Do not re-run the
+  scribe over the whole release; run it only for targeted redrafts (the
+  lead→scribe→lead loop in Step 3).
+- **The lead applies its delta-verification rule** (see release-lead.md):
+  prior ✓ marks + git-confirmed unchanged commit set → verify only the
+  delta plus a full jargon re-sweep; a moved range or missing marks → full
+  from-scratch verification, as on a first pass.
+- **Every pass appends its own release-log row** (latest row per version
+  wins); the pass that resolves a hold sets `CLEARED`/`SENT` and performs
+  the released write-back to each item's `build-report.md`
+  (release-lead.md, "What you produce").
 
 ## Decision logging
 If a genuine choice goes to the user during a release (e.g. "bundle these two
@@ -177,14 +237,25 @@ before asking, DECIDED after.
   `PROJECT-CONTEXT.md`, or the generic default) containing `release-notes.md`
   (client-facing), `release-crosswalk.md` (private), and optionally
   `decisions.md`.
-- **Templates:** `~/.claude/skills/team-release/templates/`.
+- **Templates:** `~/.claude/skills/team-release/templates/` — Step 2 seeds
+  both documents from them; they are the structural standard.
+- **Scripts:** `~/.claude/skills/team-release/scripts/` —
+  `verify_commits.py` (per-SHA existence/ancestry/date/diffstat + a `range`
+  sweep; the mechanical half of the lead's fact-check),
+  `jargon_lint.py` (the regex half of the jargon sweep), and
+  `append_release_log_row.py` (the only way release-log rows are written).
 - **Memory:** the release-log location comes from `PROJECT-CONTEXT.md` if the
   project names one; otherwise
   `~/.claude/skills/team-release/memory/release-log.md` (a cross-project
-  fallback, append-only).
-- **Client firewall:** the client only ever sees `release-notes.md`. Item
-  codes, internal ids, file paths, commit hashes, and tooling words live in
-  the crosswalk, never in the notes.
+  fallback, append-only). One row per release-lead pass, latest row per
+  version wins; each row carries a Status token (`HOLD — <reason>` /
+  `CLEARED` / `SENT <date>`) and a crosswalk link.
+- **Client firewall:** the client only ever sees `release-notes.md`. The
+  shared rule set lives at
+  `~/.claude/skills/team-release/references/client-firewall.md` (one list,
+  shared with `intake-client-liaison`); item codes, internal ids, file
+  paths, commit hashes, and tooling words live in the crosswalk, never in
+  the notes.
 - This skill is READ + verify only for product code; it writes only the
   release docs and its own memory. It does not commit, push, or send.
 

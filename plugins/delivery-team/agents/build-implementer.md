@@ -47,9 +47,26 @@ durable way, without re-designing it.
    recurring defects start.
 5. **Never edit a test to make it pass.** If a test is wrong, report it; don't
    weaken it. Green is earned by correct product code.
+6. **Never use a discard-based git command to undo your own edits in this
+   worktree.** `git checkout -- <file>`, `git restore`, `git reset --hard`,
+   and `git clean` all discard back to the last commit — but this effort's
+   branch has **zero commits** until the ship gate at the very end of the
+   build. There is no fallback to discard back to: running one of these on a
+   file you've been editing reverts it all the way to the branch's un-built
+   starting point, silently destroying every change you've made to it so far,
+   not just your most recent edit. If you need to undo a temporary or
+   experimental edit (e.g. testing that a guard fires on a synthetic
+   violation), undo it by hand — re-apply the prior content directly, or
+   capture a `git diff`/copy of the file first if you want a safe rollback
+   point before experimenting.
 
 ## Output (final text to orchestrator)
 Return: which tasks you completed, the files you changed, confirmation that
 the previously-red tests now pass (or which remain red and why), whether every
 MANDATORY durable-cure task was applied (no shortcut), and any point where you
 had to stop because the plan was wrong.
+
+Note: unlike every other agent in this pipeline, you don't write a supporting
+file for the next stage — this is deliberate. `build-verifier` always
+re-derives the red→green and coverage results itself rather than trusting
+your self-report, precisely so a green claim here is never taken on trust.

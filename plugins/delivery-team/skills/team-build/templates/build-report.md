@@ -1,8 +1,9 @@
 # Build Report — <slug>
 
 > Authored by `build-lead`, synthesizing the build brief, task list, red/green
-> evidence, and review. The document the user reads. This build **stopped at
-> green** — it did not commit, push, or open a PR.
+> evidence, and review. The document the user reads. Written before Step 8
+> ships this build automatically (commit + push on its own effort branch,
+> PR if this project has that convention) — no ask, no stop.
 
 ## What was built
 <one paragraph, plain language: the end state now sitting in the working tree>
@@ -40,10 +41,11 @@ one configured) + one line>
 - **Docker stack** (if provisioned): <compose file, project name, port block>
 
 ## Shipped commit
-- **Per repo:** <filled in after Step 8's commit — the resulting SHA, or
-  "not yet committed / stopped at green" if the user declined. This is what
-  `team-release`'s `release-lead` reads to verify what actually shipped,
-  instead of re-deriving it from raw git history.>
+- **Per repo:** <filled in immediately after Step 8's automatic commit — the
+  resulting SHA. This is what `team-release`'s `release-lead` reads to
+  verify what actually shipped, instead of re-deriving it from raw git
+  history. Confirm this field is actually filled in before ending the
+  session.>
 
 ## Residual risk & back-out
 - **Watch:** <what could still be wrong; any deferred cure and its
@@ -51,10 +53,10 @@ one configured) + one line>
 - **Back-out (per touched repo):** `git -C <worktree-path> reset --hard
   <starting-commit>`
 
-## Open decisions
-- <decision-id + status, or "none">
+## Auto-decisions this run
+- <DEC-id + one-line rationale, or "none">
 
 ## Next step
-Stops at green. **The user commits / pushes / opens a PR — or hands it back
-for changes.** This skill does not commit. Does not tear down the worktree or
-Docker stack — that's a separate, manual step at merge time.
+Ships automatically next, in Step 8 — commit + push on this effort's own
+branch, no ask. Does not tear down the worktree or Docker stack — that's a
+separate, manual step at merge time.

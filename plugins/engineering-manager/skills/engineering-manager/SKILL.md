@@ -6,15 +6,17 @@ description: >
   and gets it moving on whatever track it actually needs. `triage` sorts
   outstanding items into direct-fixable housekeeping, real work that needs
   team-intake first, and things only a human can do — then dispatches the
-  first two. `dispatch` decides whether build-ready items (intake+QA already
-  done) should build in parallel worktree efforts, sequentially, or as a
-  single normal session, then actually dispatches and babysits the runs
+  first two. `dispatch` decides whether build-ready items (intake done —
+  a missing QA test-plan self-heals downstream, team-build auto-runs
+  team-qa first) should build in parallel worktree efforts, sequentially, or
+  as a single normal session, then actually dispatches and babysits the runs
   through to merge. Both commands run the same
   decide→gate→dispatch→monitor pattern — read-only analysis, a human
   approval gate, then real delegated work, never silent auto-action. An
   optional `auto`/`auto-pilot` mode token (see "Run modes") auto-decides
-  every preference gate and cascades the same mode into every team-build/
-  team-intake delegate it dispatches, while leaving quality gates and the
+  this skill's own preference gates (its delegates run fully autonomous in
+  every mode regardless — no mode token cascades to them anymore), while
+  leaving quality gates and the
   merge-to-default-branch gate as hard stops in every mode. `status` checks
   on in-flight dispatches without re-deciding anything; `resume` answers a
   BLOCKED item and continues it. Generic — works on any project using the
@@ -40,7 +42,12 @@ not a fan-out report generator; its job doesn't stop at a recommendation.
 
 Both commands share the same shape: a **pipeline** team (analyst → optional
 judge panel → lead decide) followed by an **orchestration** phase the main
-session runs directly (dispatch, monitor, merge/record).
+session runs directly (dispatch, monitor, merge/record). **The orchestration
+phase assumes a strongest-tier session**: the decision phase's three
+advisors are pinned to a top-tier model, but the only irreversible actions —
+merging to the default branch, killing/resuming delegates, root-causing a
+live incident mid-monitor — are performed by *this* session, so don't run
+these commands from a deliberately cheap/fast session.
 
 ## Command routing
 
@@ -64,8 +71,8 @@ waits.
 
 | Mode | Token(s) | What changes |
 |---|---|---|
-| Auto-pilot | `auto-pilot`, alias `auto` | Every gate in the two references is tagged **PREFERENCE**, **QUALITY**, or the **merge gate**. PREFERENCE gates no longer stop — the team decides on its own best recommendation (always the option each gate already states as recommended, e.g. "A) Proceed as recommended"), logs the choice to `<target>/dispatch-decisions.md` or `<target>/triage-decisions.md` (from `templates/decision-log.md`) as `DECIDED-AUTO`, and keeps going. QUALITY gates (nothing to triage/dispatch against, a delegate reporting `BLOCKED:` on a decision it itself couldn't safely default) still stop, in every mode — there's no recommendation to make when the premise is broken or a downstream delegate already determined a human is required. A `FAILED:` delegate gets one auto-retry under auto-pilot (logged `DECIDED-AUTO`); if the retry also fails, that escalates to a hard stop — no unbounded auto-retry loop. **The merge gate (`dispatch` Step 6) is never auto-proceeded, in any mode** — merging into the project's actual default branch is exactly the kind of hard-to-reverse, shared-state action this environment's own standing safety floor exists for (same floor `team-build`'s "Run modes" names: no force-push, no `--no-verify`, no push/merge straight to the default branch without a human looking at it first), so it stays a stop even though the builds that produced the merge candidates ran fully unattended. |
-| **Cascade** | — | Auto-pilot doesn't stop at this skill's own gates: every delegate this skill dispatches to run `team-build` (`dispatch`) or `team-intake` (`triage`'s intake phase) is launched with that same skill's own `auto`/`auto-pilot` token, so the delegate's downstream PREFERENCE gates are auto-decided too, all the way through the pipeline. Tell `em-lead` (Step 2 of `dispatch`, Step 4 of `triage`) that this run is in auto-pilot so it bakes the token into the dispatch prompt it authors — see each reference's Step for the exact instruction. |
+| Auto-pilot | `auto-pilot`, alias `auto` | Every gate in the two references is tagged **PREFERENCE**, **QUALITY**, or the **merge gate**. PREFERENCE gates no longer stop — the team decides on its own best recommendation (always the option each gate already states as recommended, e.g. "A) Proceed as recommended"), logs the choice to `<target>/dispatch-decisions.md` or `<target>/triage-decisions.md` as `DECIDED-AUTO` (via `team-decisions`' `add_decision.py`; see `templates/decision-log.md`), and keeps going. QUALITY gates (nothing to triage/dispatch against, an unexpected `BLOCKED:` from a delegate) still stop, in every mode — there's no recommendation to make when the premise is broken. A `FAILED:` delegate gets one auto-retry under auto-pilot (logged `DECIDED-AUTO`); if the retry also fails, that escalates to a hard stop — no unbounded auto-retry loop. **The merge gate (`dispatch` Step 6) is never auto-proceeded, in any mode** — merging into the project's actual default branch is exactly the kind of hard-to-reverse, shared-state action this environment's own standing safety floor exists for (the floor `team-build`'s "No gates, no modes" section and `substrate-core/references/gates.md` both name: no force-push, no `--no-verify`, no push/merge straight to the default branch without a human looking at it first), so it stays a stop even though the builds that produced the merge candidates ran fully unattended. |
+| **No cascade (since 2026-08-14)** | — | The mode token no longer travels downstream, because there is nothing for it to change there: `team-build` removed its gates and mode tokens entirely (it runs fully autonomous and parses a bare `<path>` — a leading token risks being read as part of the path), and `team-intake` runs fully autonomous too, accepting the legacy tokens only as no-ops. So standard vs auto-pilot differ **only at this skill's own gates** — in both modes the dispatched delegates behave identically, auto-deciding what they safely can (`DECIDED-AUTO`) and treating genuinely un-decidable states as terminal outcomes. `em-lead` always authors bare-path dispatch prompts (see `templates/dispatch-protocols.md`). The practical consequence to be aware of: a background build can no longer pause mid-run to ask anything — this skill's monitoring (Step 5) and merge gate (Step 6) are the human touchpoints of the execution phase. |
 
 There is no `direct` mode for this skill — its own roster (`em-analyst` →
 optional `em-judge` panel → `em-lead`) is already the minimal shape; there's
@@ -83,12 +90,18 @@ roster elsewhere in the suite.
   when the analyst's confidence is LOW. Read-only.
 - **em-lead** — synthesizes the analyst (+ judges, if run) into a plan
   document — `dispatch-plan.md` for `dispatch`, `triage-plan.md` for
-  `triage` — with the final grouping, the concrete per-item dispatch spec,
-  and (for `dispatch`) the merge order. Writes only that report.
+  `triage`, written under the run's own `<target>/.em-state/<run-id>/`
+  directory with a `LATEST-*` pointer — with the final grouping, the
+  concrete per-item dispatch spec,
+  and (for `dispatch`) the merge order. Writes only that report (plus the
+  pointer).
 
 `triage`'s housekeeping bucket doesn't need this team — grouping direct text
 corrections by which file they touch is mechanical enough for the
-orchestrator to do directly (`references/triage.md`, Step 2). The team
+orchestrator to do directly (`references/triage.md`, Step 2). Small sets
+(fewer than ~3-4 corrections) aren't dispatched at all — the orchestrator
+edits directly in-session; larger sets go to cheap-tier (`model: "haiku"`)
+delegates, since the judgment already happened upstream. The team
 exists for the judgment calls: is it safe to run these at the same time,
 and does splitting even pay for itself.
 
@@ -117,8 +130,10 @@ Read a folder's `status-report.md`, bucket every outstanding action item:
   dispatched.
 
 Full procedure in `references/triage.md`. Once an intake delegate produces a
-`technical-plan.md`/`test-plan.md`, that item becomes a candidate for
-`dispatch` on your next run — `triage` doesn't auto-chain into `dispatch`,
+`technical-plan.md`, that item becomes a candidate for
+`dispatch` on your next run (no QA stage required in between —
+`team-build` auto-runs `team-qa` on a missing test-plan) — `triage` doesn't
+auto-chain into `dispatch`,
 so the pipeline's own re-verify-before-acting discipline still holds between
 phases.
 
@@ -127,9 +142,10 @@ phases.
 Gather the build-ready candidate set → `em-analyst` → (`em-judge` panel only
 if flagged ambiguous) → `em-lead` writes `dispatch-plan.md` → **human gate** →
 dispatch each item as a backgrounded `general-purpose` delegate running
-`team-build` → monitor completions, resuming any BLOCKED delegate once
-answered → merge DONE items in the decided order → refresh `team-status` →
-record the run. Full procedure, including the exact BLOCKED/DONE/FAILED
+`team-build` → monitor terminal reports (`DONE:`/`FAILED:` — a build
+delegate can't pause to ask anymore) → merge DONE items in the decided
+order → refresh `team-status` →
+record the run. Full procedure, including the exact terminal-report
 protocol and the merge discipline, in `references/dispatch.md`.
 
 ## `status` / `resume`
@@ -159,16 +175,23 @@ just a direct, fully-specified text correction (old string → new string, the
 fact already verified by `team-status`), so there's no nesting to reason
 about.
 
-## Why a BLOCKED delegate isn't a dead end
+## Why a BLOCKED delegate isn't a dead end (and why it's now rare)
 
-A backgrounded delegate can't pause for live `AskUserQuestion` input the way
-this session can. So it doesn't try to: it ends its turn with a `BLOCKED:`
-report and stays addressable by its agent ID. Resuming it via `SendMessage`
-continues it **with full context** — worktree state (for `dispatch`) or
-whatever intake artifacts it already drafted (for `triage`), which step it
-was on — not a restart. This only works within the session that spawned it;
+Since the 2026-08-14 downstream redesign, the delegated skills themselves
+never pause: `team-build` treats an un-proceedable state as a terminal
+outcome (`FAILED:` from the wrapper), and `team-intake` proceeds on recorded
+`DECIDED-AUTO` assumptions. `BLOCKED:` survives only in the **intake
+wrapper's** contract, for the improbable pre-skill dead end (unreadable or
+self-contradictory request materials) — and the protocol requires the
+delegate to write the question to a durable `request-blocked.md` first,
+precisely because chat history doesn't survive into a new session. When a
+`BLOCKED:` does arrive, the delegate stays addressable by its agent ID:
+resuming it via `SendMessage`
+continues it **with full context** — whatever artifacts it already
+drafted, which step it was on — not a restart. This only works within the
+session that spawned it;
 `references/status-resume.md` covers the cross-session fallback (a fresh
-delegate, informed by the now-answered `decisions.md` entry). Housekeeping
+delegate, informed by the durable on-disk record). Housekeeping
 delegates don't use this protocol at all — a stale-text correction has no
 decision to block on.
 

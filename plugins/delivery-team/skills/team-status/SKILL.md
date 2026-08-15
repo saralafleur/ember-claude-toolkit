@@ -70,7 +70,7 @@ change that, and compose in either order:
 
 | Mode | Token(s) | What changes |
 |---|---|---|
-| Auto-pilot | `auto-pilot`, alias `auto` | Every gate in "Process" is tagged **PREFERENCE**, **QUALITY**, or **required-input**. PREFERENCE gates no longer stop — the team decides on its own best recommendation (usually the option this skill already states as "recommended"), logs the choice to `status-decisions.md` as `DECIDED-AUTO`, and keeps going. The QUALITY gate (Step 1's `BLOCKED` — target doesn't exist or has nothing to assess) still stops, in every mode. This skill stays strictly read-only and advisory in every mode — "proceeds" at Step 4 means it states the recommendation as decided rather than asking, it never starts invoking `team-intake`/`team-qa`/`team-build` itself; that boundary doesn't move. |
+| Auto-pilot | `auto-pilot`, alias `auto` | Every gate in "Process" is tagged **PREFERENCE**, **QUALITY**, or **required-input**. PREFERENCE gates no longer stop — the team decides on its own best recommendation (usually the option this skill already states as "recommended"), logs the choice to `status-decisions.md` as `DECIDED-AUTO`, and keeps going. The QUALITY gates — Step 1's `BLOCKED` (target doesn't exist or has nothing to assess) and Step 4.5's proposed-corrections gate (edits to third-party pipeline docs are never auto-applied) — still stop, in every mode. This skill stays strictly read-only and advisory in every mode — "proceeds" at Step 4 means it states the recommendation as decided rather than asking, it never starts invoking `team-intake`/`team-qa`/`team-build` itself; that boundary doesn't move. |
 | Direct | `direct` | Accepted for consistency with the rest of the suite, but has little to trim here: the roster is already 3 agents (triage, per-item scanner, lead) and Steps 0.5/1.5 already do a more sophisticated version of what `director-of-engineering` would decide elsewhere — which items actually need a live re-check, fingerprinted down to the field. `director-of-engineering` is not invoked; `direct` behaves the same as standard mode for agent selection. |
 
 ## Process
@@ -88,11 +88,29 @@ whatever mode tokens are present; whatever remains is the path (which may
 still be empty — this skill is one of the ones that can run with none given).
 
 If the user gave a path, use it. **If no path was given, check for a default
-before asking:** look for a `PROJECT-CONTEXT.md` at the project root. If it
-names a "Default status scope" (or, failing that, a "Delivery pipeline
-artifacts" folder), use that as the target — state the interpretation you're
-taking ("no folder given — defaulting to `<path>` per `PROJECT-CONTEXT.md`")
-and proceed without stopping.
+before asking:** look for a `PROJECT-CONTEXT.md` at the project root — on a
+bare "next" with no path, "the project root" means **the current working
+directory's repo root** (an unstated cwd assumption until 2026-08-15: if the
+session isn't sitting in the project, there is no default to find — ask).
+Don't `Read` a large `PROJECT-CONTEXT.md` whole (a `PROJECT-CONTEXT.md` can
+exceed the 256KB Read cap in practice); **Grep for the section anchors
+you need** ("Default status scope", "Delivery pipeline artifacts") and Read
+just those line ranges. If it names a "Default status scope" (or, failing
+that, a "Delivery pipeline artifacts" folder), use that as the target —
+state the interpretation you're taking ("no folder given — defaulting to
+`<path>` per `PROJECT-CONTEXT.md`") and proceed without stopping.
+
+**Stale sibling-report warning (2026-08-15):** once the target is resolved,
+check whether a *different* `status-report.md` (with or without its own
+`.status-scratch/`) exists in a sibling or ancestor folder of the same
+project (`find <project-root> -name status-report.md -not -path
+"<target>/*"` — cheap). A superseded target's report + cache otherwise sit
+around indefinitely presenting themselves as current (a stale twin has been
+found sitting one directory above a live target before). If found, say so in the
+report-back, and offer — via Step 4.5's normal corrections gate — to
+**tombstone** the stale one: replace its content with a one-line pointer to
+the live target's report and note its `.status-scratch/` is dead. Never
+tombstone silently.
 
 🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧 — **required-input, unaffected by any mode.**
 **Only if no path was given AND no PROJECT-CONTEXT.md default exists, STOP
@@ -114,7 +132,24 @@ an exact match for reality. This is the whole point of caching: a bare
 triage call plus however many scanners. Re-verification against live code
 still happens, just only when something has actually moved.
 
-**How:**
+**How (script-first, 2026-08-15):** run the whole checklist below in one
+deterministic call — no agents, no hand-run command list:
+
+```bash
+bash ~/.claude/skills/team-status/scripts/check_staleness.sh <target> \
+  [-r <repo-root>]... [-s <shared-doc-path>]...
+```
+
+Pass one `-r` per product-code repo from `PROJECT-CONTEXT.md`'s repo
+topology and one `-s` per shared decision-log / defect-catalog /
+request-log / run-log / release-log path it names (**Grep the file for
+those section anchors — never whole-read it**; the `## Repo topology`
+section is written by the `worktree` skill, its heading is canonical, and
+its fenced yaml `members:` block is the thing to parse first). The script
+prints `NO-CACHE` (first run → Step 1, everything RESCAN), `UNCHANGED`
+(→ point 3 below), or `HIT:` lines (→ point 4 below). It encodes every
+check in points 1–2 below — which stay as the specification, and as the
+manual fallback if the script can't run:
 1. If `<target>/status-report.md` does not exist, there is no cache — skip
    straight to Step 1 (first run, nothing to trust yet, everything is
    effectively RESCAN).
@@ -124,18 +159,31 @@ still happens, just only when something has actually moved.
      --oneline -1 -- <target>` in each relevant repo (the target's own repo
      plus any product-code repos named in `PROJECT-CONTEXT.md`'s repo
      topology). Any hit at all means *something* under the target or the
-     product code changed.
+     product code changed — **except this skill's own prior-run commit**
+     (2026-08-15, self-poisoning fix): ignore a commit only when *every*
+     path it touches is `status-report.md`, `status-decisions.md`, or
+     `.status-scratch/*` (Step 4.5's own artifacts — otherwise every
+     committed run defeats the next run's fast path). A commit that touches
+     those files *plus anything else* still counts as a hit — never widen
+     this to "any commit that merely includes them."
    - **Uncommitted / untracked changes.** A report can go stale before
      anything is ever committed — e.g. a build-lead drops a new
      `build-report.md` that hasn't been committed yet. Committed-only
      checking misses this, so also run:
      `find <target> -newer <target>/status-report.md -not -path
-     '*/.status-scratch/*' -type f` and `git -C <repo-root> status
+     '*/.status-scratch/*' -not -path '*/.em-state/*' -not -name
+     'status-decisions.md' -type f` and
+     `git -C <repo-root> status
      --porcelain -- <target>`. Either returning anything counts as a hit.
      (Exclude `.status-scratch/` from the `find` — those files are the
      *output* of the last scan, not a change to detect; without the
      exclusion every run would falsely detect "change" from its own
-     previous scratch writes.)
+     previous scratch writes. Exclude `.em-state/` for the same reason —
+     it's `engineering-manager`'s dispatch bookkeeping, updated on every
+     state transition, not a change to the work items themselves. Exclude
+     `status-decisions.md` likewise — every auto-pilot run writes it
+     *after* the report, so without the exclusion the fully-cached fast
+     path is unreachable after any committed run.)
    - **Shared cross-team docs.** `<target>` and the product-code repos
      aren't the only place a load-bearing claim can go stale — a decision,
      a defect-catalog entry, or a request-log row can flip in a shared doc
@@ -154,6 +202,32 @@ still happens, just only when something has actually moved.
      claim about an item is exactly this kind of load-bearing fact — don't
      let it go stale just because the change landed in `release-log.md`
      instead of `decision-log.md`.
+   - **The global-fallback logs too — all of them** (generalized 2026-08-15
+     from a team-intake-only point-fix; workflow-audit structural 4). When a
+     project doesn't name its own shared-log paths, the family's records of
+     what happened to this project's items live in the skills' global
+     fallback ledgers under `~/.claude/skills/*/memory/` — which are not in
+     any git repo, so the git checks can't see them. Run an mtime check
+     (`-newer <target>/status-report.md`) against **each** of:
+     team-intake `memory/decision-log*.md` · team-decisions
+     `memory/decisions-log.md` (the Step 0.5 hook that skill's SKILL.md
+     documents — implemented here as of 2026-08-15) · team-release
+     `memory/release-log.md` (how a Ready-for-Deployment item's "released"
+     flip becomes visible) · engineering-manager
+     `memory/dispatch-run-log.md` · team-build `memory/build-run-log-INDEX.md`
+     + `memory/build-run-log/*.md` · team-qa `memory/qa-run-log.md`.
+     Any hit counts the same as a hit under `<target>`.
+     (`check_staleness.sh` runs this whole list automatically.)
+   - **Cheap live-state probes (2026-08-15, efficiency F1).** Git/mtime
+     detection is structurally blind to live-state drift — a container
+     down for days, a dead venv, a DB migration head contradicting the
+     docs — which is exactly what has historically forced rational
+     force-full rescans. If `PROJECT-CONTEXT.md` names live-state probes
+     (a "Status probes" / health-check section: container status, migration
+     head, a health endpoint), run them here — a handful of one-command
+     checks, no agents. A probe failure counts as a hit (and is itself a
+     finding to surface), making weekly 40-scanner sweeps rarer. If the
+     project names none, skip — don't invent probes.
 3. **If all checks are empty everywhere** — nothing changed anywhere in the
    target, the product repos, or the shared cross-team docs since the cached
    report was written — skip triage and scanning entirely. Read the
@@ -169,14 +243,29 @@ still happens, just only when something has actually moved.
 rescan" / "re-verify everything", skip this step entirely and go to Step 1
 with every item pre-marked RESCAN.
 
-### Step 1 — Triage (gate)
-Run `status-triage` on the target folder. It walks the tree, enumerates every
-work item (each distinct `intake/<date>-<slug>/` it finds, at any depth), and
-for each records the **artifact inventory** — which of these exist:
+### Step 1 — Triage (script first, agent as fallback; gate)
+The inventory is pure enumeration — no judgment yet — so run it as a script
+first (2026-08-15, workflow-audit structural 9):
+
+```bash
+python3 ~/.claude/skills/team-status/scripts/inventory_items.py <target> --json
+```
+
+It enumerates every work item (each distinct `intake/<date>-<slug>/` at any
+depth) and each item's **artifact inventory** — which of these exist:
 `technical-plan.md`, project-specific plan docs, `request-brief.md`,
 `qa/test-plan.md`, `qa/qa-assessment.md`, `build/**/build-report.md`,
-`decisions.md`. This is pure inventory — no judgment yet. It writes nothing
-but returns the item list + a `READY` / `BLOCKED` verdict.
+`decisions.md` — plus a `READY` / `EMPTY` / `BLOCKED` verdict (exit 0/2/3).
+
+**Launch the `status-triage` agent only as fallback:** when the script exits
+2 (`EMPTY` — a non-empty folder where the fixed glob found nothing; layouts
+vary, and searching a nonstandard layout is the judgment residue the agent
+exists for), or when you have concrete reason to distrust the glob for this
+project's layout. On the script's happy path, its JSON output *is* the
+triage inventory — no agent call. (Known triage-agent error classes —
+nested double-counts, artifact-absence mis-stagings — are exactly what the
+deterministic glob doesn't suffer from, and the scan path self-heals the
+rest.)
 
 🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧 — **QUALITY gate, stays in every mode,
 including auto-pilot.**
@@ -218,31 +307,65 @@ silent default.
    file's mtime moving doesn't mean a *claim* changed: someone may have just
    fixed a typo, added a pointer note, or corrected a stale "unmerged" line to
    say "merged" (the doc catching up to reality the scanner already knew).
-   Re-verifying live code for a pure wording fix wastes a scanner call. So for
-   every item marked RESCAN-CANDIDATE **whose scratch file already exists**
-   (skip this for items with no prior scratch — nothing to compare against),
-   cheaply re-extract the same fingerprint fields the scanner recorded last
-   time (see Step 2's "Write a fingerprint") from the *current* file content —
-   no agent, just `grep`/`git`:
+   Re-verifying live code for a pure wording fix wastes a scanner call.
+   **Run it as one script call** (2026-08-15, workflow-audit structural 2 —
+   this used to be ~5 hand-run greps per item per run):
+
+   ```bash
+   python3 ~/.claude/skills/team-status/scripts/fingerprint_check.py <target> \
+     --item <item-path> [--item ...] --repo <repo-root>
+   ```
+
+   for every item marked RESCAN-CANDIDATE **whose scratch file already
+   exists** (skip this for items with no prior scratch — nothing to compare
+   against). It emits `SKIP`/`RESCAN` per item with a reason that names
+   exactly which field(s) changed, and is fail-safe by construction: any
+   parse failure degrades to RESCAN, never a wrongly-trusted SKIP. **Note
+   (one-time expectation):** every scratch file written before 2026-08-15
+   predates the fingerprint-writer script and is old-grammar — the first
+   post-fix run therefore correctly reports RESCAN for all of them and runs
+   a full rescan once; that's the designed fallback, not a bug. What the
+   script re-extracts (the spec, and the manual fallback if it can't run) —
+   the same fingerprint fields the scanner recorded last time (see Step 2's
+   "Write a fingerprint") from the *current* file content:
    - **Verdict:** `grep -m1 -E '^\*\*Verdict:\*\*' <build-report.md>` → the
      GREEN / GREEN-WITH-CAVEATS / BLOCKED token.
-   - **Decisions:** for each `## DEC-<n>` heading in `decisions.md`, grep the
-     following `- **Status:**` line → collect as `DEC-n:STATUS` pairs.
+   - **Decisions:** for each decision-block heading in every `decisions.md`
+     (item root, `qa/`, `build/**`), grep the following `- **Status:**`
+     line → collect as `ID:STATUS` pairs. **Match the project's declared ID
+     grammar, not `DEC-<n>` only** (widened 2026-08-15): live heading
+     grammar includes `WATCH-n`, `PM-n`, `OD-n`, `DBA-n`, `PEND-n`,
+     `OPEN-n`, `QA-DEC-n`, letter-suffixed instances — a DEC-only grep
+     matches the DEC subset on both sides and can silently SKIP an item
+     whose WATCH/PM/OD status flipped.
    - **Test numbers:** `grep -oE '[0-9]+/[0-9]+' <build-report.md> | sort -u`.
    - **Merged:** if the fingerprint recorded a `merged_commit`, run
      `git -C <repo-root> merge-base --is-ancestor <merged_commit> <default-branch-HEAD>`
      — cheap, deterministic, no agent needed.
+   - **QA verdict:** `grep -A1 -m1 -E '^## Coverage verdict' <qa-assessment.md>
+     | tail -1` if a `qa-assessment.md` exists for this item, else `n/a` —
+     compare against the fingerprint's `qa_verdict`, same rule as every other
+     field below (a change here is load-bearing on its own, even if
+     `verdict`/`decisions`/`test_numbers` are unchanged — a re-run of
+     `team-qa` doesn't touch any build-report field).
 
    Compare each freshly-extracted field to the value recorded in the scratch
    file's fingerprint:
    - **All fields match** (or the file simply doesn't conform to these
      markers at all — see safety note) is NOT enough on its own; only
      downgrade to **SKIP** when the fields *were extractable* on both sides
-     **and matched exactly**. Note in the item's carried-forward finding that
-     it was "touched at `<time>`, fingerprint re-checked and unchanged —
-     treated as cosmetic" so this isn't silently invisible to the user.
+     **and matched exactly**. Record the annotation "touched at `<time>`,
+     fingerprint re-checked and unchanged — treated as cosmetic" in the
+     **downgrade list you pass to `status-lead` in its launch prompt at
+     Step 3** (its documented input channel; the lead renders it in the
+     report) so this isn't silently invisible to the user. Don't try to
+     write it into the item's scratch file — the single-writer rule gives
+     the orchestrator no write path into `.status-scratch/`.
    - **Any field differs** → stays **RESCAN-CANDIDATE**, a load-bearing claim
-     actually moved.
+     actually moved. **Keep the which-field-changed diff** (the script's
+     RESCAN reason line): pass it to that item's rescanning scanner in its
+     launch prompt (so it knows where to look first) *and* to `status-lead`
+     at Step 3 — until 2026-08-15 this diff died at the gate ask.
    - **Safety fallback:** if a marker can't be found at all in the *current*
      file (irregular/non-template report, like a thin item with no
      `decisions.md`, or a build-report that doesn't follow the standard
@@ -265,7 +388,13 @@ silent default.
      scratch verbatim.
    - **Trust cache, report as-is** — skip scanning even the flagged items;
      reuse the stale scratch/report content for everything, explicitly
-     flagged as unverified-since-`LAST_RUN` in the output.
+     flagged as unverified-since-`LAST_RUN` in the output. **How that flag
+     gets implemented** (it was promised but unwired until 2026-08-15):
+     tell `status-lead` in its launch prompt which items were carried
+     forward unverified despite a detected change, and instruct it to say
+     "unverified since `<LAST_RUN>`" in those items' stage-map Notes and in
+     the overall verdict line — and repeat the flag yourself in the Step 4
+     report-back.
    - **Force full rescan of all items** — ignore SKIP/RESCAN-CANDIDATE
      entirely, scanner on every item regardless of what changed. **Caution
      on large batches:** a big force rescan launches that many concurrent
@@ -284,6 +413,16 @@ silent default.
    user's invocation already said `--force` / "force rescan" / "re-verify
    everything"; or this is the first-ever run (nothing cached to offer as
    an alternative — there's no real choice to present).
+
+7. **All-SKIP branch (2026-08-15 — previously undocumented).** If step 5
+   downgraded *every* item to SKIP — Step 0.5 detected a touch somewhere,
+   but no fingerprint field moved anywhere — do **not** fall through to a
+   full opus synthesis that rewrites an identical report. Route to Step 4's
+   **fully-cached variant** exactly as if Step 0.5 had found nothing: no
+   scanners, no `status-lead`, present the cached report with a note listing
+   the touched-but-cosmetic items ("N items touched since `LAST_RUN`, all
+   fingerprint-confirmed cosmetic — cache trusted"). This is the same cost
+   Step 0.5 exists to avoid; don't pay it for a typo fix.
 
 **Safety:** if `git` is unavailable in the target repo, treat all items as
 RESCAN-CANDIDATE and note it in the ask (don't silently skip verification).
@@ -305,7 +444,20 @@ picked "force full rescan," or none at all if they picked "trust cache"
 (skip straight to Step 3 with every scratch file used as-is). Items not
 selected for scanning use their existing scratch file, passed directly to
 Step 3. Give each scanner: its item folder, the artifact inventory from
-triage, and the shared-memory paths.
+triage, the shared-memory paths, **the path to `<target>/status-decisions.md`
+if one exists from any prior run** (2026-08-15, structural 3 — prior-run
+acceptances/dispositions are an input, not just this run's), and — for a
+rescan triggered by a fingerprint diff — **the which-field-changed line from
+Step 1.5** so the scanner knows where to look first.
+
+**On a force-full rescan with a prior `status-report.md`** (2026-08-15,
+efficiency F1): also pass each scanner the prior report's *batch-wide*
+findings (shared-surface discrepancies, environment/infra findings, the
+cross-item drift list) labeled **"known — confirm or contradict in one
+command, don't re-derive."** Scanners have independently rediscovered (and
+each disclaimed) the same batch-wide issue before;
+carrying it forward turns dozens of re-derivations into one-line
+confirmations while still catching the case where it's been fixed.
 
 **Cap fan-out width against a shared, stateful dev/test stack.** If this
 project's items re-run tests against one shared dev/test stack (not a
@@ -316,7 +468,14 @@ failures that look like real regressions but aren't. Batch the launches
 instead — roughly 8-10 scanners per wave, next wave once the prior one
 returns — rather than firing the whole set in a single message. Skip this
 caution entirely when the project isolates each effort's own stack, or when
-the scan set is small.
+the scan set is small. **Before any double-digit launch, state your wave
+plan in chat** ("N items → waves of ~8: 8+8+8+…") — and make sure the wave
+structure ends up recorded in the run-log row's "Items scanned" cell
+(status-lead includes it whenever the scan set exceeded the cap). This rule
+has been violated unobservably before — large single waves launched with no
+trace left behind; a cap whose violations leave no record only exists
+in the prompt. This is contention-safety, not just cost: a transient
+contention failure written into a scratch fingerprint pollutes the cache.
 
 Each scanner
 does the load-bearing work — **read-only, but not passive:**
@@ -329,7 +488,13 @@ does the load-bearing work — **read-only, but not passive:**
   suite/filter, grep for the cited files/symbols, hit the cited endpoint. A
   report's claim is a hypothesis to test, not a fact to repeat. (This is the
   whole reason the skill exists.)
-- **Open decisions:** scan `decisions.md` for any `PENDING` / `PARKED` item.
+- **Open decisions:** scan `decisions.md` for any `PENDING` / `PARKED` /
+  `WATCH` / `DEFERRED` item (widened 2026-08-15 — the decision-log v2
+  FORMAT CONTRACT's live-tripwire tokens count as open surfaces, not just
+  the two classic ones). Also note any entry that flipped to `DECIDED-AUTO`
+  since the last status run — machine-made decisions from gateless
+  producers (`team-intake`, `team-build`, `team-decisions`) whose only
+  human-review surface is this report.
 - **Cross-item drift:** flag when a sibling item's plan/decisions were never
   updated to reflect a follow-on that touches the same surface, or when two
   items edit the same file/section. Also list, plainly, any catalog ID
@@ -339,24 +504,49 @@ does the load-bearing work — **read-only, but not passive:**
   lead doesn't have to re-derive them.
 - **Classify the stage** (one of): `not-started` · `intake-only` (plans, no
   tests) · `qa-done` (test-plan exists, not built) · `build-in-progress` ·
-  `build-green` · `build-green-with-caveats` · `stale — report contradicted
-  by live code` · `blocked — open decision`.
-- **Write a fingerprint.** At the top of the scratch file, before the
-  narrative, record the load-bearing facts as of this scan in a small
-  frontmatter block — this is what next run's Step 1.5 fingerprint re-check
-  compares against, so a future doc-only touch-up doesn't cost another
-  scanner call:
+  `build-green` · `build-green-with-qa-debt` · `build-green-with-caveats` ·
+  `stale — report contradicted by live code` · `blocked — open decision`.
+  A `FAST — QA debt` line in the build-report header is load-bearing: it
+  downgrades what would otherwise be `build-green` to
+  `build-green-with-qa-debt`, and the recommended next action for that item
+  becomes the deferred `team-qa` run — a fast build is deliberately *not*
+  done.
+- **Write a fingerprint — via the script, never hand-typed** (structural
+  fix: hand-typed fingerprint blocks have drifted from the schema before,
+  silently forcing RESCAN on every doc touch). After writing the narrative
+  findings to the scratch file, the scanner runs:
+
+  ```bash
+  python3 ~/.claude/skills/team-status/scripts/write_fingerprint.py \
+    <scratch-file> --verdict ... --merged ... --merged-commit ... \
+    --decisions ... --test-numbers ... --qa-verdict ... --verified-at ...
+  ```
+
+  which validates every enum and prepends exactly this frontmatter block —
+  the load-bearing facts as of this scan, which next run's Step 1.5
+  fingerprint re-check compares against, so a future doc-only touch-up
+  doesn't cost another scanner call:
   ```yaml
   ---
   fingerprint:
     verdict: GREEN | GREEN-WITH-CAVEATS | BLOCKED | n/a
     merged: true | false
     merged_commit: <hash> | null
-    decisions: "DEC-1:DECIDED,DEC-2:PENDING" | "none"
+    decisions: "DEC-1:DECIDED,WATCH-2:WATCH" | "none"  # ANY declared ID grammar, not DEC-only
     test_numbers: "319/319,731/731,14/14" | "none"
+    qa_verdict: ADEQUATE | GAPPED | BLIND | "GAPPED (pre-build)" | n/a
   verified_at: <run date>
   ---
   ```
+  `qa_verdict` is a **different field from `verdict`** above — `verdict` is
+  team-build's build-report call (GREEN/GREEN-WITH-CAVEATS/BLOCKED),
+  `qa_verdict` is team-qa's coverage call (ADEQUATE/GAPPED/BLIND, possibly
+  qualified "(pre-build)"). Extract it with
+  `grep -A1 -m1 -E '^## Coverage verdict' <qa-assessment.md> | tail -1` if a
+  `qa-assessment.md` exists for this item, else `n/a`. Without this field, a
+  re-run of `team-qa` that changes the coverage verdict but doesn't touch
+  any build-report field would look unchanged to the Step 1.5 fingerprint
+  re-check below and could wrongly downgrade the item to SKIP.
   Fill each field from what you already verified — no extra work. Use `n/a`
   / `null` / `"none"` for anything the item's artifacts don't have (e.g. no
   `decisions.md`). Don't force a value onto a report that doesn't cleanly
@@ -366,7 +556,22 @@ does the load-bearing work — **read-only, but not passive:**
   the final report).
 
 ### Step 3 — Synthesize + report
-Run `status-lead` with the triage inventory + every scanner's scratch file.
+Run `status-lead` with, in its launch prompt (2026-08-15 — these were
+implicit convention before; now they're the contract):
+- the triage inventory (script JSON or agent summary);
+- the scratch-file directory path — plus **each rescanned item's scanner
+  return-text**, so at large batch sizes the lead can synthesize from the
+  summaries and open only flagged items' full scratch files (see
+  status-lead.md's bounded-read rule) instead of whole-reading all N files;
+- the prior `status-report.md` path + `LAST_RUN`, and the Step 1.5
+  **SKIP/RESCAN split** (which items were re-verified this run vs. carried
+  forward);
+- the Step 1.5 **cosmetic-downgrade annotations** and any
+  **which-field-changed diffs**;
+- the path to `<target>/status-decisions.md` **if one exists from any prior
+  run** (not just this run's);
+- on a trust-cache run, the "unverified since `LAST_RUN`" item list.
+
 It writes `<target>/status-report.md` (from `templates/status-report.md`):
 **two** stage tables, in this order:
 1. **Stage-map** — every item that still has something outstanding, with
@@ -377,31 +582,69 @@ It writes `<target>/status-report.md` (from `templates/status-report.md`):
 2. **Ready for Deployment** — every item that is all-four-✅
    (Intake/QA/Build/Merged) **AND** whose merged-item follow-up type is
    `NONE` (genuinely nothing left, not even a doc/operational/
-   future-scoping residual). The moment an item first qualifies, it moves
+   future-scoping residual). **Accepted-as-is exception (2026-08-15,
+   structural 3 — third flagging of this gap since 2026-08-01):** an item
+   whose only residual is one a human has explicitly accepted — recorded as
+   a `WATCH`/`RECORD` entry in `<target>/status-decisions.md` naming that
+   finding — also graduates, with its Notes reading "residual accepted per
+   status-decisions.md <id>". Without this, an accepted `COSMETIC` residual
+   pins an item in the Stage-map forever and gets re-reported every rescan.
+   The moment an item first qualifies, it moves
    OUT of the Stage-map and INTO this table — it never appears in both.
    Displayed **second**, after the Stage-map, so outstanding work is what a
    reader sees first (see the template's "Ready for Deployment" convention).
    **"Ready for Deployment" means code-complete and merged — it is NOT the
    same fact as "released."** Whether a client has actually been told about
-   an item is `team-release`'s ledger (`team-release/memory/release-log.md`),
-   which this skill doesn't track or check. An item can sit in this table
+   an item is `team-release`'s ledger — the release-log the project's own
+   `PROJECT-CONTEXT.md` names; only when a project names none does it fall
+   back to the near-always-empty global
+   `team-release/memory/release-log.md`. An item can sit in this table
    indefinitely without a release ever being cut; that's expected, not a
-   status gap — see `team-release` for shipping it.
+   status gap — see `team-release` for shipping it. **But once the
+   release-log DOES record the item as released** (2026-08-15, structural
+   4 — closing the reverse write-back left half-open since 2026-08-01),
+   `status-lead` annotates or retires the row — "Released in `<version>`
+   per release-log" — instead of asserting "ready, not released" forever;
+   the release-log is in its input list and Step 0.5's ledger checks make
+   the flip detectable.
 
 Then a **merged-item follow-up** breakdown for every item that IS merged
 (classified `NONE` / `COSMETIC` / `DOC CLEANUP` / `OPERATIONAL` /
 `DEPENDS-ON-ITEM` / `FUTURE SCOPING` — see the template) — this is what
-determines which table an item belongs in. The reconciled true state, open
-`PENDING`/`PARKED` decisions, cross-item drift, a **parallelization
-opportunity** check (whether two or
+determines which table an item belongs in. A **"Changed since last run"**
+element (2026-08-15 — ratifying what the lead already did by convention):
+which items flipped state vs. the prior report, using the SKIP/RESCAN split
+passed in. The reconciled true state, open
+`PENDING`/`PARKED`/`WATCH`/`DEFERRED` decisions **plus a count of entries
+flipped to `DECIDED-AUTO` since the last run**, cross-item drift, a
+**parallelization opportunity** check (whether two or
 more ready-to-build items are independent enough to run as concurrent
 `team-build` worktree efforts, laid out as an Option A: concurrent / Option
 B: sequential trade-off — never a unilateral pick), and — the point of the
 whole skill — **the single recommended next action**: *which skill to invoke
 (`team-intake` / `team-qa` / `team-build` / `librarian`), on which folder,
 and why*, citing the concrete gap. It also appends one row to the status
-run-log. Capture its headline recommendation and, if present, the
-parallelization choice verbatim.
+run-log — **only via `scripts/add_status_run_log_row.py`, never hand-typed**
+(2026-08-15, structural 1). Pass the lead the gate answers already known at
+launch time (the Step 1.5 scan choice, any `DECIDED-AUTO` picks) for the
+row's `Gate answers` cell; gates that resolve *after* synthesis (Step 4
+proceed, parallelization, Step 4.5 corrections) get recorded by the
+orchestrator in `status-decisions.md` at Step 4.5 instead — every gate
+answer lands in exactly one of the two places, none evaporate. Capture the
+lead's headline recommendation and, if present, the parallelization choice
+verbatim.
+
+**In-flight dispatch check (2026-08-15, engineering-manager seam):** before
+finalizing any per-item recommendation, check
+`<target>/.em-state/dispatch-state.json` / `triage-state.json` (if
+present) — an item recorded there as `IN_PROGRESS`, `BLOCKED`, or
+`READY-TO-MERGE` may already have a live `engineering-manager` delegate
+working it. Flag such items **"in-flight via engineering-manager dispatch —
+do not recommend `team-build` on this item"** (recommending it invites the
+exact double-worker worktree collision the dispatch log documents). A
+stale-looking entry (old `dispatched_at`, prior session) is still worth
+naming so the reader reconciles it with `engineering-manager status`
+rather than starting a second build blind.
 
 ### Step 4 — Report back
 Present the reconciled state **in chat as plain-text tables** (ASCII-style
@@ -436,7 +679,13 @@ UI/artifact page unless she explicitly asks for one):
 - **Anything the reports got wrong** — every place a plan/report claim was
   contradicted by the live re-verification (this is the highest-value
   output).
-- **Open decisions** still `PENDING` / `PARKED`.
+- **Changed since last run** — which items flipped state vs. the prior
+  report (from the lead's section of the same name), so a returning reader
+  sees the delta, not just the absolute state.
+- **Open decisions** still `PENDING` / `PARKED` / `WATCH` / `DEFERRED` —
+  plus the line "**DEC entries flipped to `DECIDED-AUTO` since the last
+  status run: N (unreviewed by a human)**" whenever N > 0; this report is
+  the review surface for the pipeline's gateless producers.
 - **The single next action** — the skill to run next, the target folder, and
   the one-line why.
 - Links to `status-report.md` and any per-item scratch worth reading.
@@ -455,26 +704,35 @@ change what the skill *does* — it's still read-only/advisory in every mode
 and does not itself invoke `team-intake`/`team-qa`/`team-build`; "proceeds"
 here means it stops phrasing the recommendation as a question.
 
-**Fully cached variant (Step 0.5 found nothing changed, no agents ran):**
+**Fully cached variant (Step 0.5 found nothing changed — or Step 1.5's
+all-SKIP branch fired — no agents ran):**
 Skip the bullets above — there is no fresh reconciliation to summarize.
 Instead state plainly: the target has had no changes since `status-report.md`
 was last written at `<LAST_RUN>`; present that report's stage-map and
 recommended next action as-is (clearly labeled as cached, not re-verified
 this run); and mention that a full rescan can be requested (`--force` /
 "force rescan") if they want it re-verified anyway despite no detected
-changes.
+changes. **Two rules made explicit 2026-08-15:** the proceed gate above
+**still fires** on this variant (the cached recommendation is still put to
+the user as a question — or stated as decided under auto-pilot); and a
+fully-cached run appends **no run-log row** and skips Step 4.5 entirely
+(nothing new was produced — that's by design, not an omission).
 
 🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧 — **PREFERENCE gate.**
 **If `status-lead` found a parallelization opportunity** (two or more
 independent build-ready items), do not fold that into the same yes/no —
-put it to the user as its own explicit choice via `AskUserQuestion` with
-three options:
+put it to the user as its own explicit choice via `AskUserQuestion`. **Use
+the same two option letters the report itself uses** (re-lettered
+2026-08-15 — the gate used to present a different "Option A" than the
+report the user had just read, and auto-pilot auto-picked the one the
+report never described):
 
-- **Option A — fresh chats, one per item (recommended default).** For each
-  item, generate a short, fully self-contained kickoff line:
+- **Option A — run concurrently** (matches the report's Option A). Default
+  execution — **fresh chats, one per item, recommended**: for each item,
+  generate a short, fully self-contained kickoff line:
   `Run team-build on <absolute path to the item's intake-base folder>`
   — nothing else. Print all N kickoff lines as separate copy-paste blocks in
-  the chat reply. Do **not** spawn any subagent for this option — the whole
+  the chat reply. Do **not** spawn any subagent for this form — the whole
   point is that the current session does nothing further; the user opens N
   new chat sessions and pastes one line into each. This works *because* the
   pipeline is designed for it: everything a fresh session needs
@@ -484,27 +742,30 @@ three options:
   beyond the folder path to work, that's a signal the item's own plan/
   decisions docs are incomplete — fix the docs, don't patch around it by
   stuffing context into the kickoff line.
-- **Option B — concurrent in this session.** Launch the named items as
-  parallel agent calls in one message. Use a plain subagent call (e.g.
-  `general-purpose`, or omit `subagent_type`) that invokes the `team-build`
-  skill itself from a clean start — **never `subagent_type: "fork"` for
-  this.** A fork inherits this session's *entire* conversation history as
-  its starting context, and a long-running status/build session can easily
-  be tens or hundreds of thousands of tokens deep — the fork pays that
-  inheritance cost before it does a single second of the item's own work,
-  on top of a task that (per Option A's own premise) needed none of it. Each
+  Alternative execution (only if the user asks to stay in-session) —
+  **concurrent in this session**: launch the named items as parallel agent
+  calls in one message, each a plain subagent call (e.g. `general-purpose`,
+  or omit `subagent_type`) that invokes the `team-build` skill itself from
+  a clean start — **never `subagent_type: "fork"` for this.** A fork
+  inherits this session's *entire* conversation history as its starting
+  context, and a long-running status/build session can easily be tens or
+  hundreds of thousands of tokens deep — the fork pays that inheritance
+  cost before it does a single second of the item's own work, on top of a
+  task that (per the fresh-chats premise) needed none of it. Each
   concurrent branch still goes through its own `build-triage` for its own
   worktree, same as any single `team-build` run — just launched together.
   State the time-saved trade-off, and that results still land back in this
   session (which keeps growing this conversation's size).
-- **Option C — sequential in this session.** One at a time, priority order.
-  State the lower-review-load trade-off.
+- **Option B — run sequentially** (matches the report's Option B). One at a
+  time, priority order, in this session. State the lower-review-load
+  trade-off.
 
 Let the user pick; there is no unilateral default beyond presenting A first.
 Whichever is chosen, proceed accordingly. **Under auto-pilot,** skip the ask:
-auto-pick **Option A** (already this skill's own presented-first default —
-fresh, self-contained kickoff lines, no subagent spawned), log it as
-`DECIDED-AUTO`, and print the kickoff lines directly instead of waiting.
+auto-pick **Option A in its fresh-chats form** (already this skill's own
+presented-first default — fresh, self-contained kickoff lines, no subagent
+spawned), log it as `DECIDED-AUTO`, and print the kickoff lines directly
+instead of waiting.
 
 ### Step 4.5 — Commit pipeline docs, and apply any proposed corrections (gate)
 This step runs at the **orchestrator level** — the main agent, using its own
@@ -518,7 +779,11 @@ involved and `status-lead`'s own tool grant/write-scope doesn't change.
   section** (from `status-lead` — see its role file), gate on it before
   touching anything:
 
-  🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧 — **PREFERENCE gate.**
+  🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧 — **QUALITY gate — stops in EVERY mode,
+  including auto-pilot; corrections are never auto-applied.** (Retagged
+  from PREFERENCE 2026-08-15: the old tag contradicted this gate's own
+  "never auto-applied" body text, and the wrong reading auto-edits
+  third-party pipeline docs.)
   Show each proposed correction (file · old text → new text · one-line why);
   ask lettered — **A)** apply all · **B)** apply some · **C)** apply none.
   On A/B, apply each approved edit with the file-edit tool against its real
@@ -526,9 +791,25 @@ involved and `status-lead`'s own tool grant/write-scope doesn't change.
   write to (`decision-log.md`, the defect catalog, a sibling item's own
   `decisions.md`), which is exactly why it's gated and never auto-applied.
   Never touch product code, a plan, or a test this way.
+- **Record every correction's disposition** (2026-08-15, structural 3 —
+  before this, a declined correction was indistinguishable from a
+  never-noticed one, and the next 40-scanner pass re-derived it): log each
+  drafted correction into `<target>/status-decisions.md` using the existing
+  v2 status tokens — applied → `DONE` · declined → `WATCH` (known and
+  deliberately carried — scanners/lead treat it as "previously seen, report
+  once as such, don't re-draft") · deferred → `DEFERRED`. One short block
+  per correction, `add_decision.py`-conformant. **Also record here, one
+  line each, the Step 4 gate answers** that resolved after the run-log row
+  was written (proceed choice, parallelization choice, this gate's own
+  answer) — the observability half of the same audit finding.
 - **Then make one local commit** covering `status-report.md`,
-  `.status-scratch/*`, the run-log row, and any corrections just applied —
-  stage by explicit path, never `git add -A` (a shared repo may have
+  `.status-scratch/*`, `status-decisions.md` (if written), any corrections
+  just applied, and — **only when the project names its own in-repo
+  status-run-log** — that log's new row. (Reworded 2026-08-15: the global
+  fallback log lives outside any git repo, so in every observed run to date
+  the run-log row was uncommittable — listing it unconditionally made the
+  documented commit content impossible.) Stage by explicit path, never
+  `git add -A` (a shared repo may have
   unrelated in-flight work sitting in the same working tree). **Never
   push** — pushing stays `wrap-up`'s job, not this skill's. Report the
   commit hash in the chat reply; this must be visible, not silent.
@@ -553,11 +834,12 @@ remembered. Two places:
    `templates/decision-log.md`) — the question, dated context, options, and
    the decision.
 2. **Global:** the status-run-log row captures the run; note the decision
-   there in one line.
+   in its `Gate answers` cell in a few words (post-synthesis answers go in
+   `status-decisions.md` instead — see Step 4.5).
 Write it `PENDING` before asking; flip to `DECIDED` / `PARKED` once answered.
 
 **Propagate the flip, don't just log it.** The moment a decision this run
-touches moves off `PENDING`/`PARKED` anywhere in the project, name every
+touches moves off `PENDING`/`PARKED` (or `WATCH`/`DEFERRED`) anywhere in the project, name every
 other doc that still cites the old status in the Step 4 report-back — a
 cached report, a sibling's `decisions.md`, the defect catalog. This team
 can't edit those on its own initiative (read-only outside Step 4.5), so the
@@ -585,8 +867,9 @@ reciprocal-cross-reference check `status-lead` runs during synthesis.
   applies to every human gate in this skill that presents more than one
   path forward: Step 0's ambiguous-scope ask, Step 1.5's rescan-scope ask
   (when not using `AskUserQuestion`), Step 4's proceed-with-recommendation
-  callout, and the parallelization-opportunity gate's Option A/B/C (already
-  lettered — keep it that way). A gate with only one path (e.g. a plain
+  callout, and the parallelization-opportunity gate's Option A/B (already
+  lettered, matching the report's own letters — keep it that way). A gate
+  with only one path (e.g. a plain
   yes/no "proceed?") doesn't need lettering — this is for genuine multi-way
   choices.
 - **Cache-first, not verify-first.** `status-report.md` plus the
@@ -601,6 +884,13 @@ reciprocal-cross-reference check `status-lead` runs during synthesis.
   moment something *is* detected, re-verification still happens for real
   (see "The recurring trap this skill exists to catch" below) — caching only
   skips the re-verify step when there is genuinely nothing new to check.
+  One consequence to own openly: the `worktree` skill recomputes
+  merged/dirty state live on every run, while this skill serves a cached
+  fingerprint until change detection fires — so the two can give opposite
+  answers on "is this merged?" in the same minute. On any such
+  disagreement, `worktree`'s answer is the current one; treat the
+  discrepancy as a signal this skill's cache needs a rescan, not as a
+  conflict to adjudicate.
 - **Mtime detects a touch; the fingerprint decides if it was a *claim*.** A
   file's mtime moving (Step 1.5, steps 1–4) is deliberately a coarse,
   cheap trigger — it catches every edit, including pure doc cleanup that
@@ -628,13 +918,44 @@ reciprocal-cross-reference check `status-lead` runs during synthesis.
   `<target>/.status-scratch/*.md`, + `status-decisions.md` only if a decision
   was logged).
 - **Templates:** `~/.claude/skills/team-status/templates/`.
+- **Scripts:** `~/.claude/skills/team-status/scripts/` (added 2026-08-15) —
+  `check_staleness.sh` (Step 0.5), `inventory_items.py` (Step 1),
+  `fingerprint_check.py` (Step 1.5), `write_fingerprint.py` (scanners,
+  Step 2), `add_status_run_log_row.py` (status-lead, Step 3),
+  `check_backlinks.py` (status-lead's reciprocity sweep). Deterministic
+  recipes run as scripts; agents handle the judgment residue.
 - **Memory:** the status run-log location comes from `PROJECT-CONTEXT.md` if
   the project names one; otherwise
   `~/.claude/skills/team-status/memory/status-run-log.md` (a cross-project
-  fallback, append-only). It has no forked defect-catalog file — it reads the
-  project's own if one is configured.
+  fallback, append-only — **rotated 2026-08-15**: rows go through
+  `scripts/add_status_run_log_row.py` only, 7 columns, 400-char field cap;
+  readers `grep` by project, never Read the file whole; prior history lives
+  in `memory/archive/status-run-log-2026-07-20-to-2026-08-14.md`;
+  re-rotate near ~150KB). It has no forked defect-catalog file — it reads
+  the project's own if one is configured.
+- **Session model:** this skill assumes the invoking session runs a strong
+  model — `status-scanner` deliberately has no `model:` line and inherits
+  whatever the session runs, and Steps 0.5/1.5 execute orchestrator-side.
+  (Documented 2026-08-15; the inherit choice itself is settled — logged
+  runs to date show no tier-attributable misses.)
+- **Downstream consumers:** `engineering-manager` reads `status-report.md`
+  to triage/dispatch work — its buckets are keyed off this skill's
+  merged-item follow-up taxonomy (`NONE`/`COSMETIC`/`DOC CLEANUP`/
+  `OPERATIONAL`/`DEPENDS-ON-ITEM`/`FUTURE SCOPING`) and stage vocabulary,
+  so renaming either silently breaks it. It also dispatches builds and only
+  refreshes status after merge — hence Step 3's in-flight dispatch check.
 - **Repo layout is project-specific — check `PROJECT-CONTEXT.md` first**, or
   discover it. Verification commands run inside the project's actual repo(s).
+  **Never `Read` a `PROJECT-CONTEXT.md` whole** — the file can exceed the
+  256KB Read cap (one real install's file reached 541KB; a whole-read fails
+  outright, and a whole-read failure has been observed to fan that
+  unsatisfiable instruction out across many scanners at once).
+  `Grep` for the section anchors you need (defect-class catalog / "Recurring
+  issues", `## Repo topology`, shared-log paths, "Default status scope") and
+  Read only those ranges. The `## Repo topology` heading is canonical and
+  written by the `worktree` skill — parse its fenced yaml `members:` block
+  first. Restructuring the oversized container is out of scope for this
+  skill — treat it as a project-level decision.
 - **`fork` is for work that genuinely needs this session's conversation —
   not a default delegation tool.** A fork inherits the *entire* current
   conversation as its starting context. For any item whose full context

@@ -1,7 +1,7 @@
 ---
 name: team-intake
 description: 'Run a virtual delivery team (triage, product owner, architect, engineer, QA, project manager, tech lead) over an incoming client request — on any project. Use when: a new feature/bug/change request comes in and needs to be understood, classified, and turned into a plan before any code is written; you have a file or folder describing what a client wants; you want intake/triage of a request; you need a technical plan AND a project-manager plan; or you want to know "have we seen this request before?" before acting. Produces a technical plan and a PM plan per request and remembers recurring issues (when the project has a defect catalog configured) so the team stops going in circles.'
-argument-hint: '[<path> | auto|auto-pilot [direct] <path> | direct [auto] <path> | fast <path>] — path to the intake base folder (holds the request; an `intake/` subfolder is created inside it for the plans). Optional — will ask if omitted. See "Run modes" for the auto-pilot/direct/fast tokens.'
+argument-hint: '[<path> | direct <path> | fast <path>] — path to the intake base folder (holds the request; an `intake/` subfolder is created inside it for the plans). The run is fully autonomous — no human gates; every choice is made by the team, logged as DECIDED-AUTO, and reported at the end. `auto`/`auto-pilot` tokens are accepted for compatibility (they change nothing). See "Run modes" for direct/fast.'
 ---
 
 # Team Intake
@@ -52,21 +52,27 @@ and delegate each role to a subagent. You are the delivery lead.
 
 ## Run modes
 
-Standard mode (bare `<path>`) is the default described in "Process" below:
-the fixed 8-agent roster, every 🟧 gate stops and waits. Two optional modes
-change that, and compose in either order (`auto direct <path>` /
-`direct auto <path>`):
+**This skill runs fully autonomous in every mode — there are no human
+gates.** (Removed 2026-08-14 on the user's direction, during the workflow-audit
+apply pass.) Every choice the process used to stop for is instead made by
+the team on its own best recommendation, logged to `decisions.md` as
+`DECIDED-AUTO`, and listed plainly in the Step 6 report-back so nothing is
+decided invisibly. A `BLOCKED` triage verdict no longer stops the run
+either — see Step 2 for how it proceeds on recorded assumptions. The
+`auto`/`auto-pilot` tokens are still accepted for compatibility but change
+nothing.
+
+Standard mode (bare `<path>`) runs the fixed 8-agent roster. Two optional
+modes change the roster, and compose (`direct <path>`, `fast <path>`):
 
 | Mode | Token(s) | What changes |
 |---|---|---|
-| Auto-pilot | `auto-pilot`, alias `auto` | Every gate in "Process" is tagged **PREFERENCE**, **QUALITY**, or **required-input**. PREFERENCE gates no longer stop — the team decides on its own best recommendation, logs the choice to `decisions.md` as `DECIDED-AUTO`, and keeps going. QUALITY gates (an actually-`BLOCKED` verdict) still stop, in every mode — there's no recommendation to make when the request itself isn't understood. |
-| Direct | `direct` | Right after Step 2's triage returns `READY`, run `director-of-engineering` with this skill's own roster (the table above) instead of the fixed Step 3 fan-out; execute exactly the agents/order it returns in place of Steps 3–5. |
-| Fast | `fast` | **Implies `auto` + `direct`**, plus a speed bias: get something working with the direction still checked, QA deferred. Tell the director this run is **fast** — its roster default inverts to *skip unless load-bearing for direction* (product-owner/architect/tech-lead lean toward kept, `intake-qa` toward skipped; a defect-catalog match still forces the guardrail back on). At Step 6, the auto-decision becomes **"proceed straight to `team-build fast`"** — skipping the `team-qa` stage entirely — logged as `DECIDED-AUTO` with the deferred-QA trade-off named. QUALITY and required-input gates still stop, like every mode. |
+| Direct | `direct` | Right after Step 2's triage verdict, run `director-of-engineering` with this skill's own roster (the table above) instead of the fixed Step 3 fan-out; execute exactly the agents/order it returns in place of Steps 3–5. **`intake-project-manager` is never skippable** — it owns memory, `pm-plan.md`, and the `DECIDED-AUTO` self-consistency audit, which is the pipeline's only remaining internal check now that gates are gone. |
+| Fast | `fast` | **Implies `direct`**, plus a speed bias: get something working with the direction still checked, QA deferred. Tell the director this run is **fast** — its roster default inverts to *skip unless load-bearing for direction* (product-owner/architect/tech-lead lean toward kept, `intake-qa` toward skipped; a defect-catalog match still forces the guardrail back on; the PM still always runs). At Step 6, the auto-decision becomes **"proceed straight to `team-build fast`"** — skipping the `team-qa` stage entirely — logged as `DECIDED-AUTO` with the deferred-QA trade-off named. |
 
 Both modes still write every artifact this skill normally writes, to the same
 paths — `direct` just produces fewer `supporting/*.md` files (only for the
-agents actually run), and `auto-pilot` still writes `decisions.md`, just with
-`DECIDED-AUTO` entries instead of a stop.
+agents actually run).
 
 ## Process
 
@@ -75,52 +81,96 @@ The provided folder is the **intake base folder**: it holds the request
 materials *and* is where the plans get written (under an `intake/`
 subfolder).
 
-- Parse the skill argument for a leading mode token first — `auto`/
-  `auto-pilot`, `direct`, and/or `fast` (which implies both), in any order,
-  before the path (see "Run modes" above). Strip whatever mode tokens are
-  present; whatever remains is the folder.
+- Parse the skill argument for a leading mode token first — `direct` and/or
+  `fast` (which implies direct), plus the legacy no-op tokens
+  `auto`/`auto-pilot`, in any order, before the path (see "Run modes"
+  above). Strip whatever mode tokens are present; whatever remains is the
+  folder.
 - If the user gave a folder path (as the skill argument or in the message),
   use it as the intake base folder. The request materials (ticket, email,
   doc, screenshots) live in this folder. (If they pointed at a single file
   instead, treat that file's parent folder as the base folder.)
-
-🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧 — **required-input, unaffected by any mode.**
-- **If no folder was given, STOP and ask:** "Which folder should I work in?
-  Point me at the folder that holds the request — I'll create an `intake/`
-  subfolder inside it for the plans." No mode removes this gate — there's
-  nothing to recommend a location for.
-- Do not invent a request or a location.
+- **If no folder was given**, resolve it from the conversation context (a
+  folder or request file discussed this session). If nothing resolvable
+  exists, the run cannot start — say so plainly and end; there is no
+  request to intake. Do not invent a request or a location. (This is an
+  error condition, not a gate — nothing to decide, nothing to run on.)
 
 ### Step 1 — Set up the intake folder
 - Derive a short `slug` from the request (kebab-case, ~3 words).
-- Create `<intake-base>/intake/<YYYY-MM-DD>-<slug>/` and a `supporting/`
-  subfolder inside it. Use today's date. **Never write the plans to the root
-  of `<intake-base>`** — they always go under the `intake/` subfolder it
-  creates.
+- Scaffold with the script (creates the folder set and seeds `decisions.md`
+  from the template so the FORMAT CONTRACT comment lands in every run):
+
+  ```
+  python3 ~/.claude/skills/team-intake/scripts/init_intake.py \
+    <intake-base> <slug>
+  ```
+
+  It creates `<intake-base>/intake/<YYYY-MM-DD>-<slug>/` plus `supporting/`,
+  using today's date. **Same-day collision rule:** if that folder already
+  exists (a re-run or follow-up on the same slug today), the script appends
+  `-2`, `-3`, … and prints the path it actually created — use the printed
+  path. **Never write the plans to the root of `<intake-base>`** — they
+  always go under the `intake/` subfolder. (If the script is unavailable,
+  do the same by hand, including the collision suffix and the seeded
+  `decisions.md`.)
+- **Re-entry check (before running the team):** glob
+  `<intake-base>/intake/*/` for an existing intake whose slug/brief covers
+  the same ask. If one exists, this run is a *revision* — say so, link the
+  prior folder in the new `request-brief.md` and `pm-plan.md`, and have the
+  PM treat the prior plans as history rather than producing a disconnected
+  second plan.
 
 ### Step 2 — Triage (gate)
 Run `intake-triage` on the source → it writes `request-brief.md` and returns
 a `READY` / `BLOCKED` verdict.
 
+**PARKED re-trigger check — run by you, the orchestrator, while triage
+works** (this is your step, not the triage agent's):
+
+```
+python3 ~/.claude/skills/team-decisions/scripts/scan_decisions.py --json \
+  <intake-base> <project-root-if-different>
+```
+
+The scanner finds every `*decisions.md` under the given roots (use the
+project root; add the intake base separately if it lives outside the repo)
+and classifies statuses reliably — including format-drifted blocks a raw
+grep would miss. From its PARKED list, flag any entry whose note names the
+area this request touches — a PARKED decision often carries an explicit
+re-trigger condition ("re-confirm when X gets scoped into a build cycle")
+that only fires if someone actually checks. Don't auto-resolve a hit:
+record it as a `WATCH` row in this run's `decisions.md`, name it in the
+Step 6 report-back, and let the evaluators treat the parked question as
+live context. This makes the re-trigger check systematic instead of
+dependent on someone happening to remember.
+
 **If `direct` was requested (including via `fast`):** once triage returns
-`READY`, run `director-of-engineering` now with this skill's own roster (the
+its verdict (READY, or BLOCKED with assumptions adopted per above), run
+`director-of-engineering` now with this skill's own roster (the
 table under "The team") instead of the fixed Step 3 fan-out below — it writes
 `run-plan.md`; execute exactly the agents/order it returns in place of
 Steps 3–5. **If the run is `fast`, say so in the director's prompt** — its
 keep/skip default inverts (see its "Fast mode" section).
 
-🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧 — **QUALITY gate, stays in every mode,
-including auto-pilot.**
-- If **BLOCKED**, surface its blocking questions to the user with
-  `AskUserQuestion` (or plain text) and wait. **Do not run the rest of the
-  team on a request nobody understands.** A `BLOCKED` verdict means the
-  premise is actually unclear — auto-pilot has no "best recommendation" for a
-  request nobody has pinned down, so it stops here too.
-- **Log every clarifying/blocking question and its answer** (see "Decision
-  logging" below) — before you ask, record the question + dated context +
-  options as `PENDING`; when the user answers, update it to `DECIDED` with
-  their choice and any note. Then update the brief with the answers and
-  proceed.
+**On a `BLOCKED` verdict, do not stop — proceed on recorded assumptions.**
+(Gate removed 2026-08-14 on the user's direction.) For each blocking question
+triage returned:
+- Adopt the best-supported assumption (from the request materials, the
+  project record, the decision-log, and triage's own non-blocking
+  assumption list) and record the question + dated context + options +
+  the adopted assumption in `decisions.md` as `DECIDED-AUTO`, with the
+  rationale naming it an *assumption adopted in lieu of an answer*.
+- Update the brief with the adopted assumptions, then run the rest of the
+  team as normal.
+- **Flag the run loudly:** the Step 6 report-back must open with a
+  "Proceeded despite BLOCKED triage — N assumptions adopted" line listing
+  each one, so a wrong guess is cheap to catch and reverse before anything
+  gets built. The plans exist to be reviewed; nothing is implemented by
+  this skill.
+Non-blocking clarifying questions get the same treatment: log as
+`DECIDED-AUTO` with the assumption, keep going (see "Decision logging"
+below).
 
 ### Step 3 — Evaluate (parallel fan-out)
 Launch these **four agents in parallel** (one message, multiple tool calls).
@@ -130,40 +180,56 @@ Give each the `request-brief.md` path and the `supporting/` output path:
 - `intake-engineer` → `supporting/engineer.md`
 - `intake-qa` → `supporting/qa.md`
 
+Tell each to **start from the brief's Scout digest** (triage's shared
+findings: stack, layout, test commands, candidate files, relevant
+defect-catalog entries) instead of re-deriving those facts — their
+*judgment* stays independent; the perspective-independent discovery is
+paid once, by triage.
+
 ### Step 4 — Project Manager
 Run `intake-project-manager`. It reads the brief + the four supporting files
-+ **PM memory** (this project's own request-log and defect catalog, if
-configured), classifies the request, reconstructs history, writes
-`pm-plan.md`, and updates the request-log (and the defect catalog if it's a
-repeat or a likely-repeat and the project has one). Capture its final
-**request type** — the tech lead needs it.
++ **PM memory** (the decision-log, this project's own request-log *if
+`PROJECT-CONTEXT.md` names one*, the defect catalog if configured, and the
+project's existing `intake/*/` folders as the history record), classifies
+the request, reconstructs history, writes `pm-plan.md`, and updates memory
+(the defect catalog if it's a repeat or a likely-repeat and the project has
+one; the project's own request-log if it has one — **the global request-log
+was retired 2026-08-14 and no longer exists**). Capture its final
+**request type** — the tech lead needs it. The PM runs in **every** mode,
+including direct/fast — the director may not skip it.
 
 ### Step 5 — Technical plan
-Run `intake-tech-lead` with the brief, the three supporting files
-(architect/engineer/qa), and the PM's classification → it writes
-`technical-plan.md`.
+Run `intake-tech-lead` with the brief, the supporting files
+(product-owner/architect/engineer/qa — whichever ran), and the PM's
+classification → it writes `technical-plan.md`. If its summary returns any
+`decisions.md` row content (a PENDING/WATCH scope boundary), **you** append
+it via `add_decision.py` — the tech-lead deliberately cannot write that
+file itself.
 
 ### Step 6 — Report back
 Summarize for the user in the chat:
+- **If triage was BLOCKED:** open with "Proceeded despite BLOCKED triage —
+  N assumptions adopted", listing each adopted assumption first.
 - Request **type** and **"seen before?"** (cite the defect-catalog id if
   matched and this project has one configured).
 - The PM's headline recommendation (esp. the cycle-breaker if recurring).
 - The technical approach in 2–3 bullets.
 - Any **PENDING / PARKED decisions** still open (from `decisions.md`).
-- **Under auto-pilot:** also list every `DECIDED-AUTO` entry from this run —
-  "Decided automatically (auto-pilot): N items — see decisions.md."
+- Every `DECIDED-AUTO` entry from this run — "Decided automatically:
+  N items — see decisions.md."
 - Links to `pm-plan.md`, `technical-plan.md`, and `decisions.md`.
 
-🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧 — **PREFERENCE gate.**
-Then ask whether to proceed to implementation (out of scope for this skill).
-**Under auto-pilot,** skip the ask: default to "yes, proceed to `team-qa`
-next" (unblocking the next stage is this skill's whole purpose), log it to
-`decisions.md` as `DECIDED-AUTO`, and say so plainly in the summary above
-instead of waiting. **Under fast,** the auto-decision is instead "proceed
-straight to `team-build fast`" — the `team-qa` stage is deliberately
-skipped; log the `DECIDED-AUTO` entry naming the trade-off (QA deferred,
-build will carry a `FAST — QA debt` stamp so a later `team-status` pass
-recommends the follow-up `team-qa` run).
+**Next stage (no ask, no wait):** the run always ends by *recording* the
+next step, never by silently invoking another skill. Log "proceed to
+`team-qa` next" to `decisions.md` as `DECIDED-AUTO` (unblocking the next
+stage is this skill's whole purpose) and state it plainly in the summary —
+the actual `team-qa` invocation is the user's (or a supervising
+orchestrator's) to make; this skill does not launch it. **Under fast,**
+the auto-decision is instead "proceed straight to `team-build fast`" — the
+`team-qa` stage is deliberately skipped; log the `DECIDED-AUTO` entry
+naming the trade-off (QA deferred, build will carry a `FAST — QA debt`
+stamp so a later `team-status` pass recommends the follow-up `team-qa`
+run).
 
 ### Step 7 — Client approval sheet (optional, on demand)
 When sign-off items need to go to a non-technical client, run
@@ -174,25 +240,41 @@ the returned answers map back to the internal items/decisions. The client
 only ever sees `client-approval.md`.
 
 ## Decision logging
-Whenever a clarifying or blocking question goes to the user — at the Step 2
-gate or anywhere a decision is genuinely the user's to make — record it so
-the team keeps a readable history of *what we chose and why* (and never
-re-litigates a settled call). Two places:
+Whenever the team encounters a question that would once have gone to the
+user — a triage ambiguity, a genuine preference fork, a scope call — record
+it so the team keeps a readable history of *what we chose and why* (and
+never re-litigates a settled call). Two places:
 
 1. **Per request:** `<intake-base>/intake/<date>-<slug>/decisions.md` (from
    `templates/decision-log.md`) — the full, readable record. For each
    question capture, in this order: **the question**, **"where we're coming
    from"** (the dated history/context — current ask vs. what was decided
-   before and when, and what conflicts), **the options offered**, and **the
-   decision** (chosen option + verbatim user note + implications). Mirror the
-   way it's presented in chat.
-2. **Global:** append a one-line row to the decision-log (location per
-   `PROJECT-CONTEXT.md`, else this skill's global fallback memory).
+   before and when, and what conflicts), **the options considered**, and
+   **the decision** (chosen option + rationale + implications). **Author
+   new blocks with the script, not by hand** — it emits the FORMAT-CONTRACT
+   shape by construction and self-checks it parses back clean:
 
-Write the entry as `PENDING` *before* asking; flip to `DECIDED` (or `PARKED`
-if the user defers it to a stakeholder) once they answer. The PM reads the
-decision-log during history reconstruction, so a question answered once
-stays answered.
+   ```
+   python3 ~/.claude/skills/team-decisions/scripts/add_decision.py \
+     <decisions.md> --id DEC-<n> --title "..." --status DECIDED-AUTO ...
+   ```
+
+2. **Global:** append a one-line row to the decision-log (location per
+   `PROJECT-CONTEXT.md`, else this skill's global fallback memory) — via
+   the validated appender, never a hand-typed row:
+
+   ```
+   python3 ~/.claude/skills/team-intake/scripts/append_intake_decision_row.py \
+     --project "<project>" --slug "<slug>" --decision-id DEC-<n> \
+     --item "<area>" --status DECIDED-AUTO \
+     --decision "<one line, ≤300 chars>" --link "<path/decisions.md>"
+   ```
+
+Questions the team answers itself are logged directly as `DECIDED-AUTO`
+with the adopted assumption/recommendation. `PARKED` remains available when
+the materials themselves defer something to a named stakeholder. The PM
+reads the decision-log during history reconstruction, so a question
+answered once stays answered.
 
 **Propagate the flip, don't just log it.** The moment an entry moves off
 `PENDING`/`PARKED`, grep the project for every other doc that cited its old
@@ -205,24 +287,15 @@ report-back** instead of leaving it silently stale — that's what lets a
 later `team-status` pass close the loop.
 
 ## Conventions
-- **Human gates must be visible, not just asked.** At every 🟧 HUMAN GATE
-  REQUIRED point, present the question as its own standalone callout in the
-  actual chat reply — **include the literal `🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧`
-  banner line**, not just the blockquote underneath it:
-
-  > 🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧
-  >
-  > **Human decision needed:** <the question>
-
-  Never fold a gate's question into a narrative summary paragraph where it
-  reads as background rather than a stop-and-wait point. If more than one gate
-  applies in the same report-back, each gets its own banner + callout — do not
-  merge them into a single generic "want me to proceed?".
-- **When a gate offers a choice in plain chat text (not via `AskUserQuestion`),
-  letter the options** — `**A)**`, `**B)**`, `**C)**`, etc. — so the user can
-  answer with a single letter instead of re-describing the option. A gate
-  with only one path (a plain yes/no "proceed?") doesn't need lettering —
-  this is for genuine multi-way choices.
+- **Autonomous decisions must be visible, not silent.** There are no human
+  gates in this skill (removed 2026-08-14). The compensating discipline:
+  every choice the team makes on the user's behalf is (1) logged to
+  `decisions.md` as `DECIDED-AUTO` with its rationale, (2) listed in the
+  Step 6 report-back, and (3) — for assumptions adopted over a BLOCKED
+  triage verdict — flagged at the *top* of the report-back, not buried.
+  The `intake-project-manager`'s DECIDED-AUTO self-consistency audit (its
+  job 2) is the standing internal check on these decisions and is why the
+  PM can never be skipped.
 - **Intake base folder:** provided by the user (skill argument or message);
   if omitted, the skill asks for it. The request lives here and the
   per-request output is written under an `intake/` subfolder inside it —
@@ -234,8 +307,19 @@ later `team-status` pass close the loop.
 - **PM memory:** location comes from `PROJECT-CONTEXT.md` if the project
   names one; otherwise `~/.claude/skills/team-intake/memory/` (a
   cross-project fallback — defect catalog read first every run if the
-  project has one configured; `request-log.md` and `decision-log.md`
-  append-only).
+  project has one configured; `decision-log.md` append-only, scripted
+  appends only, rows ≤300 chars). **The global `request-log.md` was
+  retired and deleted 2026-08-14** — request history now lives in each
+  project's own request-log (if `PROJECT-CONTEXT.md` names one) and in the
+  project's `intake/*/` folders themselves.
+- **Project profile (write-once, then reuse):** if the project has no
+  `PROJECT-CONTEXT.md` — or has one with no profile section — after Step 5
+  write/append a short profile (stack, layout, test commands, memory
+  locations) to `PROJECT-CONTEXT.md` at the project root, log it as
+  `DECIDED-AUTO`, and name it in the Step 6 report-back. Later intakes,
+  and every other delivery-team skill, then trust the profile instead of
+  re-discovering the project each run (the `worktree` skill's established
+  pattern).
 - Investigation is read-only. This skill plans; it does not modify product
   code.
 

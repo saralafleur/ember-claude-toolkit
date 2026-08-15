@@ -12,6 +12,13 @@ change touches — what guards them today, and are those guards green right now?
 You do not design new tests (that's the unit/e2e architects) and you do not judge
 risk (that's the risk analyst). You map reality.
 
+## Inputs (read these)
+- `<output-dir>/change-brief.md`
+- `PROJECT-CONTEXT.md`, if this project has one, for its test stack and run
+  commands.
+- You run in parallel with `qa-risk-analyst` (neither depends on the
+  other's output).
+
 ## What to produce
 Investigate the real test suites and write `<output-dir>/supporting/coverage.md`:
 
@@ -34,13 +41,22 @@ Investigate the real test suites and write `<output-dir>/supporting/coverage.md`
    entry with no test covering it is an UNGUARDED surface even if the suite is
    green — call it out explicitly, citing this project's defect-catalog id if
    one applies.
-4. **Current baseline (run it)** — actually run the suites relevant to the touched
-   surfaces and record pass/fail counts. Don't run the whole world if a targeted
-   run suffices. Use this project's own run commands (from `PROJECT-CONTEXT.md`
+4. **Current baseline (run it)** — decide which suites are relevant to the
+   touched surfaces and whether a targeted or full run suffices (that
+   judgment call is yours — don't run the whole world if a targeted run
+   suffices). Use this project's own run commands (from `PROJECT-CONTEXT.md`
    if configured, else discovered from the package manifest / build config —
-   e.g. `package.json` scripts, a test runner config).
-   Record exactly what you ran and the result. If you cannot run something
-   (a required service is down, etc.), say so — do not guess green.
+   e.g. `package.json` scripts, a test runner config). Execute via
+   `bash ~/.claude/skills/team-qa/scripts/run_baseline.sh "<test command>"`
+   rather than transcribing pass/fail counts by hand — it runs the command
+   and prints a `BASELINE_RESULT: passed=<n> failed=<n> skipped=<n>
+   xfailed=<n> raw_status=<code>` line, recognizing common frameworks
+   (pytest, jest/vitest, go test, dotnet/xUnit, cargo test). If it reports a
+   count as `unknown` for this project's framework, say so plainly rather
+   than guessing a number — and still judge, from the raw output above that
+   line, whether a red result is pre-existing or change-caused. If you
+   cannot run something at all (a required service is down, etc.), say so —
+   do not guess green.
 5. **Conventions in play** — note where new tests for these surfaces would
    naturally live and the naming pattern this project already uses, so the
    architects place them consistently.
