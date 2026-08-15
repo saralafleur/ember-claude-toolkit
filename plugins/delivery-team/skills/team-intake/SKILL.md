@@ -2,6 +2,16 @@
 name: team-intake
 description: 'Run a virtual delivery team (triage, product owner, architect, engineer, QA, project manager, tech lead) over an incoming client request — on any project. Use when: a new feature/bug/change request comes in and needs to be understood, classified, and turned into a plan before any code is written; you have a file or folder describing what a client wants; you want intake/triage of a request; you need a technical plan AND a project-manager plan; or you want to know "have we seen this request before?" before acting. Produces a technical plan and a PM plan per request and remembers recurring issues (when the project has a defect catalog configured) so the team stops going in circles.'
 argument-hint: '[<path> | direct <path> | fast <path>] — path to the intake base folder (holds the request; an `intake/` subfolder is created inside it for the plans). The run is fully autonomous — no human gates; every choice is made by the team, logged as DECIDED-AUTO, and reported at the end. `auto`/`auto-pilot` tokens are accepted for compatibility (they change nothing). See "Run modes" for direct/fast.'
+allowed-tools:
+  - Read
+  - Write
+  - Edit
+  - Grep
+  - Glob
+  - Bash
+  - Workflow
+  - Workflow(delivery-team:intake)
+  - Agent(intake-client-liaison)
 ---
 
 # Team Intake
@@ -43,12 +53,13 @@ and delegate each role to a subagent. You are the delivery lead.
 > and `~/.claude/agents/<name>.md` means "the matching file in this plugin's
 > own `agents/` folder" — same relative layout, different root.
 
-> **How to invoke each role:** these are registered subagent types — launch
-> each with `subagent_type: "<name>"` (e.g. `subagent_type: "intake-architect"`).
-> Always give the agent: the request-brief path, the output dir, and the
-> PM's classification once known. (If for some reason a name isn't available
-> as a subagent type, fall back to a `general-purpose` agent and paste the
-> role brief from `~/.claude/agents/<name>.md`.)
+> **How the team actually runs:** `intake-triage` through `intake-tech-lead`
+> (everything in Steps 2–5) run inside one `Workflow` call —
+> `workflows/intake.js` — not as `Agent` calls you make directly; the script
+> invokes each by its registered subagent type (`agentType: "<name>"`, e.g.
+> `"intake-architect"`) and reuses these same agent files unchanged. Only
+> `intake-client-liaison` (Step 7, on demand) is still a plain `Agent` call
+> you launch yourself with `subagent_type: "intake-client-liaison"`.
 
 ## Run modes
 
@@ -67,7 +78,7 @@ modes change the roster, and compose (`direct <path>`, `fast <path>`):
 
 | Mode | Token(s) | What changes |
 |---|---|---|
-| Direct | `direct` | Right after Step 2's triage verdict, run `director-of-engineering` with this skill's own roster (the table above) instead of the fixed Step 3 fan-out; execute exactly the agents/order it returns in place of Steps 3–5. **`intake-project-manager` is never skippable** — it owns memory, `pm-plan.md`, and the `DECIDED-AUTO` self-consistency audit, which is the pipeline's only remaining internal check now that gates are gone. |
+| Direct | `direct` | Right after triage returns its verdict, the pipeline (Step 2's `Workflow` call) runs `director-of-engineering` with this skill's own roster (the table above) instead of the fixed evaluation fan-out; it runs exactly the agents/order the director returns in place of the fixed roster. **`intake-project-manager` is never skippable** — it owns memory, `pm-plan.md`, and the `DECIDED-AUTO` self-consistency audit, which is the pipeline's only remaining internal check now that gates are gone. |
 | Fast | `fast` | **Implies `direct`**, plus a speed bias: get something working with the direction still checked, QA deferred. Tell the director this run is **fast** — its roster default inverts to *skip unless load-bearing for direction* (product-owner/architect/tech-lead lean toward kept, `intake-qa` toward skipped; a defect-catalog match still forces the guardrail back on; the PM still always runs). At Step 6, the auto-decision becomes **"proceed straight to `team-build fast`"** — skipping the `team-qa` stage entirely — logged as `DECIDED-AUTO` with the deferred-QA trade-off named. |
 
 Both modes still write every artifact this skill normally writes, to the same
@@ -121,12 +132,13 @@ subfolder).
   PM treat the prior plans as history rather than producing a disconnected
   second plan.
 
-### Step 2 — Triage (gate)
-Run `intake-triage` on the source → it writes `request-brief.md` and returns
-a `READY` / `BLOCKED` verdict.
+### Step 2 — Run the intake pipeline
 
-**PARKED re-trigger check — run by you, the orchestrator, while triage
-works** (this is your step, not the triage agent's):
+**PARKED re-trigger check — run this yourself, before starting the pipeline
+below** (this used to run concurrently with triage; it's now sequential
+since the pipeline is one background `Workflow` call and can't be handed a
+second input mid-flight — the scan itself is sub-second, so this costs
+nothing material):
 
 ```
 python3 ~/.claude/skills/team-decisions/scripts/scan_decisions.py --json \
@@ -139,77 +151,61 @@ and classifies statuses reliably — including format-drifted blocks a raw
 grep would miss. From its PARKED list, flag any entry whose note names the
 area this request touches — a PARKED decision often carries an explicit
 re-trigger condition ("re-confirm when X gets scoped into a build cycle")
-that only fires if someone actually checks. Don't auto-resolve a hit:
-record it as a `WATCH` row in this run's `decisions.md`, name it in the
-Step 6 report-back, and let the evaluators treat the parked question as
-live context. This makes the re-trigger check systematic instead of
-dependent on someone happening to remember.
+that only fires if someone actually checks. Collect the matching notes as
+plain strings — this becomes the `watchNotes` arg below.
 
-**If `direct` was requested (including via `fast`):** once triage returns
-its verdict (READY, or BLOCKED with assumptions adopted per above), run
-`director-of-engineering` now with this skill's own roster (the
-table under "The team") instead of the fixed Step 3 fan-out below — it writes
-`run-plan.md`; execute exactly the agents/order it returns in place of
-Steps 3–5. **If the run is `fast`, say so in the director's prompt** — its
-keep/skip default inverts (see its "Fast mode" section).
+Then run the actual pipeline — triage, the direct-mode routing branch (if
+`direct`/`fast`), the 4-agent evaluation fan-out, the PM, and the tech lead
+— as one call:
 
-**On a `BLOCKED` verdict, do not stop — proceed on recorded assumptions.**
-(Gate removed 2026-08-14 on the user's direction.) For each blocking question
-triage returned:
-- Adopt the best-supported assumption (from the request materials, the
-  project record, the decision-log, and triage's own non-blocking
-  assumption list) and record the question + dated context + options +
-  the adopted assumption in `decisions.md` as `DECIDED-AUTO`, with the
-  rationale naming it an *assumption adopted in lieu of an answer*.
-- Update the brief with the adopted assumptions, then run the rest of the
-  team as normal.
-- **Flag the run loudly:** the Step 6 report-back must open with a
-  "Proceeded despite BLOCKED triage — N assumptions adopted" line listing
-  each one, so a wrong guess is cheap to catch and reverse before anything
-  gets built. The plans exist to be reviewed; nothing is implemented by
-  this skill.
-Non-blocking clarifying questions get the same treatment: log as
-`DECIDED-AUTO` with the assumption, keep going (see "Decision logging"
-below).
+```
+Workflow({
+  scriptPath: "~/.claude/skills/team-intake/workflows/intake.js",
+  args: {
+    intakeDir: "<intake-base>/intake/<date>-<slug>",
+    briefPath: "<intake-base>/intake/<date>-<slug>/request-brief.md",
+    supportingDir: "<intake-base>/intake/<date>-<slug>/supporting",
+    mode: "standard" | "direct" | "fast",
+    watchNotes: [ "<matching PARKED note>", ... ]
+  }
+})
+```
 
-### Step 3 — Evaluate (parallel fan-out)
-Launch these **four agents in parallel** (one message, multiple tool calls).
-Give each the `request-brief.md` path and the `supporting/` output path:
-- `intake-product-owner` → `supporting/product-owner.md`
-- `intake-architect` → `supporting/architect.md`
-- `intake-engineer` → `supporting/engineer.md`
-- `intake-qa` → `supporting/qa.md`
+(Under a plugin install, `scriptPath` is
+`${CLAUDE_PLUGIN_ROOT}/skills/team-intake/workflows/intake.js` instead —
+same "Path note" translation as everywhere else in this file.)
 
-Tell each to **start from the brief's Scout digest** (triage's shared
-findings: stack, layout, test commands, candidate files, relevant
-defect-catalog entries) instead of re-deriving those facts — their
-*judgment* stays independent; the perspective-independent discovery is
-paid once, by triage.
+This one call replaces what used to be four separate steps (triage,
+direct-mode routing, the evaluate fan-out, PM, tech-lead) — the script
+invokes the same agents, in the same order, with the same fan-out, just as
+deterministic code instead of prose instructions. **The run goes silent in
+this session until it completes** — a background job, not a live stream —
+so say so before starting it. It returns an object; use it in Step 6 below.
+See `workflows/intake.js` itself for exactly what each phase does — the
+mechanics described in the old Steps 2–5 (BLOCKED never stops the run,
+assumptions get adopted instead; the PM is never skippable in any mode;
+`direct`/`fast` route through `director-of-engineering` first) are all
+still true, just executed by the script now instead of by you.
 
-### Step 4 — Project Manager
-Run `intake-project-manager`. It reads the brief + the four supporting files
-+ **PM memory** (the decision-log, this project's own request-log *if
-`PROJECT-CONTEXT.md` names one*, the defect catalog if configured, and the
-project's existing `intake/*/` folders as the history record), classifies
-the request, reconstructs history, writes `pm-plan.md`, and updates memory
-(the defect catalog if it's a repeat or a likely-repeat and the project has
-one; the project's own request-log if it has one — **the global request-log
-was retired 2026-08-14 and no longer exists**). Capture its final
-**request type** — the tech lead needs it. The PM runs in **every** mode,
-including direct/fast — the director may not skip it.
-
-### Step 5 — Technical plan
-Run `intake-tech-lead` with the brief, the supporting files
-(product-owner/architect/engineer/qa — whichever ran), and the PM's
-classification → it writes `technical-plan.md`. If its summary returns any
-`decisions.md` row content (a PENDING/WATCH scope boundary), **you** append
-it via `add_decision.py` — the tech-lead deliberately cannot write that
-file itself.
+**Writing back what the workflow decided:** the script never touches the
+filesystem itself — every artifact (`request-brief.md`, `supporting/*.md`,
+`pm-plan.md`, `technical-plan.md`) is still written by the agent that owns
+it, exactly as before. What it *does* return is
+`decisionRowsToRecord` — every question the team answered on its own
+(adopted assumptions, the PM's own decisions, any PENDING/WATCH scope
+boundary the tech lead flagged) — and **you** are the one who logs them,
+same separation of duties as before (the tech lead "deliberately cannot
+write `decisions.md` itself"): for each row, call
+`add_decision.py` (per-request log) and, once per request,
+`append_intake_decision_row.py` (the global row) — see "Decision logging"
+below for both commands' exact shape.
 
 ### Step 6 — Report back
-Summarize for the user in the chat:
-- **If triage was BLOCKED:** open with "Proceeded despite BLOCKED triage —
-  N assumptions adopted", listing each adopted assumption first.
+Read the workflow's return value first, then summarize for the user in the
+chat:
+- **If `triageVerdict` is `BLOCKED`:** open with "Proceeded despite BLOCKED
+  triage — N assumptions adopted", listing each of `adoptedAssumptions`
+  first.
 - Request **type** and **"seen before?"** (cite the defect-catalog id if
   matched and this project has one configured).
 - The PM's headline recommendation (esp. the cycle-breaker if recurring).
@@ -313,9 +309,10 @@ later `team-status` pass close the loop.
   project's own request-log (if `PROJECT-CONTEXT.md` names one) and in the
   project's `intake/*/` folders themselves.
 - **Project profile (write-once, then reuse):** if the project has no
-  `PROJECT-CONTEXT.md` — or has one with no profile section — after Step 5
-  write/append a short profile (stack, layout, test commands, memory
-  locations) to `PROJECT-CONTEXT.md` at the project root, log it as
+  `PROJECT-CONTEXT.md` — or has one with no profile section — after Step 2's
+  pipeline finishes, write/append a short profile (stack, layout, test
+  commands, memory locations) to `PROJECT-CONTEXT.md` at the project root, log
+  it as
   `DECIDED-AUTO`, and name it in the Step 6 report-back. Later intakes,
   and every other delivery-team skill, then trust the profile instead of
   re-discovering the project each run (the `worktree` skill's established
