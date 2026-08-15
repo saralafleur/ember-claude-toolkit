@@ -2,6 +2,15 @@
 name: team-status
 description: 'Run a virtual delivery-status team over a folder in a project''s delivery pipeline and answer "where are we, and what do we invoke next?" — on any project. Use when: you open a batch or an intake-base folder and need to know the true current state of every work item in it; a plan/report might be stale and you want it re-verified against the live code, not just re-read; you are picking up work someone else (or a past session) produced and need to reconstruct it; or you want a single, current status-report.md that says which of team-intake / team-qa / team-build / librarian to run next and why. Also trigger on short, bare prompts asking to reconstruct current state and the next step — e.g. "next", "next?", "what''s next", "where are we", "where are we at", "status check", "status" — even with no folder named (Step 0 resolves the folder from PROJECT-CONTEXT.md or asks). Produces one status-report.md per run and a thin run-log, and it NEVER changes product code, plans, or tests — it is read-only and advisory (except its own local, docs-only commits — see Step 4.5).'
 argument-hint: '[<path> | auto|auto-pilot <path> | direct <path>] — path to the folder to assess (a whole batch, or a single intake-base folder). Optional — will ask if omitted. See "Run modes" for the auto-pilot/direct tokens.'
+allowed-tools:
+  - Read
+  - Grep
+  - Glob
+  - Bash
+  - AskUserQuestion
+  - Workflow
+  - Workflow(delivery-team:status-scan)
+  - Agent(status-triage)
 ---
 
 # Team Status
@@ -55,12 +64,13 @@ test, or another team's memory.
 > and `~/.claude/agents/<name>.md` means "the matching file in this plugin's
 > own `agents/` folder" — same relative layout, different root.
 
-> **How to invoke each role:** these are registered subagent types — launch
-> each with `subagent_type: "<name>"` (e.g. `subagent_type: "status-scanner"`).
-> Always give the agent: the target folder, the output path for the report,
-> and (for scanners) the specific item folder it owns. (If a name isn't
-> available as a subagent type, fall back to a `general-purpose` agent and
-> paste the role brief from `~/.claude/agents/<name>.md`.)
+> **How the team actually runs:** `status-scanner` (fanned out) and
+> `status-lead` (Steps 2–3) run inside one `Workflow` call —
+> `workflows/status-scan.js` — not as `Agent` calls you make directly; the
+> script invokes each by its registered subagent type and reuses these same
+> agent files unchanged. `status-triage` (Step 1's fallback path only) is
+> still a plain `Agent` call you launch yourself, since it may need to run
+> before the workflow's inputs even exist.
 
 ## Run modes
 
@@ -356,16 +366,16 @@ silent default.
      downgrade to **SKIP** when the fields *were extractable* on both sides
      **and matched exactly**. Record the annotation "touched at `<time>`,
      fingerprint re-checked and unchanged — treated as cosmetic" in the
-     **downgrade list you pass to `status-lead` in its launch prompt at
-     Step 3** (its documented input channel; the lead renders it in the
-     report) so this isn't silently invisible to the user. Don't try to
-     write it into the item's scratch file — the single-writer rule gives
-     the orchestrator no write path into `.status-scratch/`.
+     **downgrade list you pass into Step 2's `Workflow` call** as
+     `cosmeticDowngradeAnnotations` (its documented input channel; the lead
+     renders it in the report) so this isn't silently invisible to the user.
+     Don't try to write it into the item's scratch file — the single-writer
+     rule gives the orchestrator no write path into `.status-scratch/`.
    - **Any field differs** → stays **RESCAN-CANDIDATE**, a load-bearing claim
      actually moved. **Keep the which-field-changed diff** (the script's
-     RESCAN reason line): pass it to that item's rescanning scanner in its
-     launch prompt (so it knows where to look first) *and* to `status-lead`
-     at Step 3 — until 2026-08-15 this diff died at the gate ask.
+     RESCAN reason line): pass it as that item's `fieldChangedDiff` in Step
+     2's `itemsToScan` — the script hands it to both the rescanning scanner
+     (so it knows where to look first) and `status-lead`.
    - **Safety fallback:** if a marker can't be found at all in the *current*
      file (irregular/non-template report, like a thin item with no
      `decisions.md`, or a build-report that doesn't follow the standard
@@ -436,215 +446,86 @@ from the shared doc that actually changed. Mark every item whose
 RESCAN-CANDIDATE outright and skip fingerprinting for those; say so
 plainly in the ask.
 
-### Step 2 — Scan (parallel fan-out, one scanner per item)
-Launch one `status-scanner` **per item the Step 1.5 answer selected for
-scanning** in parallel (one message, multiple tool calls) — this is the
-RESCAN-CANDIDATE set if the user picked "rescan flagged," all items if they
-picked "force full rescan," or none at all if they picked "trust cache"
-(skip straight to Step 3 with every scratch file used as-is). Items not
-selected for scanning use their existing scratch file, passed directly to
-Step 3. Give each scanner: its item folder, the artifact inventory from
-triage, the shared-memory paths, **the path to `<target>/status-decisions.md`
-if one exists from any prior run** (2026-08-15, structural 3 — prior-run
-acceptances/dispositions are an input, not just this run's), and — for a
-rescan triggered by a fingerprint diff — **the which-field-changed line from
-Step 1.5** so the scanner knows where to look first.
+### Step 2 — Run the scan pipeline
+Resolve, from Step 1.5's answer, exactly which items to scan and which to
+carry forward:
+- **`itemsToScan`** — the RESCAN-CANDIDATE set if the user picked "rescan
+  flagged," all items if they picked "force full rescan," or none at all if
+  they picked "trust cache." For each, include the which-field-changed line
+  from Step 1.5 if this item was flagged by the fingerprint re-check.
+- **`skippedItems`** — every item carried forward from cache, with its
+  reason (unchanged, or fingerprint-confirmed cosmetic).
+- **`capConcurrency`** — `true` when this project's items re-run tests
+  against one shared, stateful dev/test stack (check `PROJECT-CONTEXT.md`)
+  **and** the scan set is large (double digits); `false` when the project
+  isolates each effort's own stack, or the scan set is small. **Before any
+  double-digit launch with capping on, state your wave plan in chat** ("N
+  items → waves of ~8: 8+8+8+…").
 
-**On a force-full rescan with a prior `status-report.md`** (2026-08-15,
-efficiency F1): also pass each scanner the prior report's *batch-wide*
-findings (shared-surface discrepancies, environment/infra findings, the
-cross-item drift list) labeled **"known — confirm or contradict in one
-command, don't re-derive."** Scanners have independently rediscovered (and
-each disclaimed) the same batch-wide issue before;
-carrying it forward turns dozens of re-derivations into one-line
-confirmations while still catching the case where it's been fixed.
+Then run the actual scan-and-synthesize pipeline as one call:
 
-**Cap fan-out width against a shared, stateful dev/test stack.** If this
-project's items re-run tests against one shared dev/test stack (not a
-per-effort isolated one — check `PROJECT-CONTEXT.md`) and the scan set is
-large (double digits), launching every scanner in one batch risks the
-concurrent test runs contending with each other and producing transient
-failures that look like real regressions but aren't. Batch the launches
-instead — roughly 8-10 scanners per wave, next wave once the prior one
-returns — rather than firing the whole set in a single message. Skip this
-caution entirely when the project isolates each effort's own stack, or when
-the scan set is small. **Before any double-digit launch, state your wave
-plan in chat** ("N items → waves of ~8: 8+8+8+…") — and make sure the wave
-structure ends up recorded in the run-log row's "Items scanned" cell
-(status-lead includes it whenever the scan set exceeded the cap). This rule
-has been violated unobservably before — large single waves launched with no
-trace left behind; a cap whose violations leave no record only exists
-in the prompt. This is contention-safety, not just cost: a transient
-contention failure written into a scratch fingerprint pollutes the cache.
+```
+Workflow({
+  scriptPath: "~/.claude/skills/team-status/workflows/status-scan.js",
+  args: {
+    targetDir: "<target>",
+    reportPath: "<target>/status-report.md",
+    itemsToScan: [ {slug, path, fieldChangedDiff?}, ... ],
+    skippedItems: [ {slug, path, reason}, ... ],
+    triageInventory: <Step 1's JSON or agent summary>,
+    priorReportPath: "<target>/status-report.md (if one already existed)",
+    lastRun: "<Step 0.5's LAST_RUN timestamp>",
+    statusDecisionsPath: "<target>/status-decisions.md (if one exists)",
+    cosmeticDowngradeAnnotations: [ "<Step 1.5 annotation>", ... ],
+    unverifiedSinceLastRun: [ "<slug>", ... ],  // trust-cache branch only
+    batchWideFindings: <prior report's batch-wide findings, force-rescan only>,
+    capConcurrency: true | false,
+    waveSize: 8
+  }
+})
+```
 
-Each scanner
-does the load-bearing work — **read-only, but not passive:**
-- **Reconcile intent vs. state:** read `technical-plan.md` (what was
-  intended) against `build-report.md` (what was last reported done/verified)
-  and the QA `qa-assessment.md` verdict.
-- **Re-verify, don't quote.** For any load-bearing claim in a report —
-  "GREEN", "DEFERRED", "N/N tests pass", "migration applied", "e2e not
-  run" — check whether it is *still true now*: re-run the cited
-  suite/filter, grep for the cited files/symbols, hit the cited endpoint. A
-  report's claim is a hypothesis to test, not a fact to repeat. (This is the
-  whole reason the skill exists.)
-- **Open decisions:** scan `decisions.md` for any `PENDING` / `PARKED` /
-  `WATCH` / `DEFERRED` item (widened 2026-08-15 — the decision-log v2
-  FORMAT CONTRACT's live-tripwire tokens count as open surfaces, not just
-  the two classic ones). Also note any entry that flipped to `DECIDED-AUTO`
-  since the last status run — machine-made decisions from gateless
-  producers (`team-intake`, `team-build`, `team-decisions`) whose only
-  human-review surface is this report.
-- **Cross-item drift:** flag when a sibling item's plan/decisions were never
-  updated to reflect a follow-on that touches the same surface, or when two
-  items edit the same file/section. Also list, plainly, any catalog ID
-  (`RI-00N`, `DEC-N`) this item's own docs cite by reference — you don't need
-  to chase whether the reference is reciprocated (that check runs once, at
-  synthesis, in `status-lead`), just surface which IDs are in play so the
-  lead doesn't have to re-derive them.
-- **Classify the stage** (one of): `not-started` · `intake-only` (plans, no
-  tests) · `qa-done` (test-plan exists, not built) · `build-in-progress` ·
-  `build-green` · `build-green-with-qa-debt` · `build-green-with-caveats` ·
-  `stale — report contradicted by live code` · `blocked — open decision`.
-  A `FAST — QA debt` line in the build-report header is load-bearing: it
-  downgrades what would otherwise be `build-green` to
-  `build-green-with-qa-debt`, and the recommended next action for that item
-  becomes the deferred `team-qa` run — a fast build is deliberately *not*
-  done.
-- **Write a fingerprint — via the script, never hand-typed** (structural
-  fix: hand-typed fingerprint blocks have drifted from the schema before,
-  silently forcing RESCAN on every doc touch). After writing the narrative
-  findings to the scratch file, the scanner runs:
+(Under a plugin install, `scriptPath` is
+`${CLAUDE_PLUGIN_ROOT}/skills/team-status/workflows/status-scan.js` instead
+— same "Path note" translation as everywhere else in this file.)
 
-  ```bash
-  python3 ~/.claude/skills/team-status/scripts/write_fingerprint.py \
-    <scratch-file> --verdict ... --merged ... --merged-commit ... \
-    --decisions ... --test-numbers ... --qa-verdict ... --verified-at ...
-  ```
+This one call replaces what used to be two separate steps — the per-item
+scanner fan-out and the status-lead synthesis. The mechanics described in
+the old Steps 2–3 are all still true, just executed by the script now
+instead of by you:
+- **Each scanner** reconciles intent vs. state, re-verifies every
+  load-bearing claim against the live code (never quotes a report's claim as
+  fact), checks for open decisions and cross-item drift, classifies the
+  stage, writes its narrative findings to
+  `<target>/.status-scratch/<item-slug>.md`, and writes the fingerprint
+  frontmatter via `write_fingerprint.py` — all via its own `Write`/`Bash`
+  tools, unchanged. On a force-full rescan with a prior report, each scanner
+  also gets that report's batch-wide findings, labeled "known — confirm or
+  contradict in one command, don't re-derive."
+- **When `capConcurrency` is set**, the script batches the launches itself
+  (default 8 per wave, next wave once the prior one returns) instead of
+  firing the whole set in one message — this is the contention-safety rule
+  for a shared dev/test stack, now enforced structurally instead of by
+  prompt discipline alone. The wave structure is visible in the script's own
+  progress log.
+- **`status-lead`** synthesizes everything into `status-report.md` — the
+  two-table stage-map/Ready-for-Deployment split, the merged-item follow-up
+  breakdown, the "changed since last run" element, open decisions, cross-item
+  drift, the parallelization-opportunity check, the in-flight
+  `engineering-manager` dispatch check (it reads
+  `<target>/.em-state/dispatch-state.json`/`triage-state.json` itself), and
+  the single recommended next action — then appends its own run-log row via
+  `add_status_run_log_row.py`, unchanged.
 
-  which validates every enum and prepends exactly this frontmatter block —
-  the load-bearing facts as of this scan, which next run's Step 1.5
-  fingerprint re-check compares against, so a future doc-only touch-up
-  doesn't cost another scanner call:
-  ```yaml
-  ---
-  fingerprint:
-    verdict: GREEN | GREEN-WITH-CAVEATS | BLOCKED | n/a
-    merged: true | false
-    merged_commit: <hash> | null
-    decisions: "DEC-1:DECIDED,WATCH-2:WATCH" | "none"  # ANY declared ID grammar, not DEC-only
-    test_numbers: "319/319,731/731,14/14" | "none"
-    qa_verdict: ADEQUATE | GAPPED | BLIND | "GAPPED (pre-build)" | n/a
-  verified_at: <run date>
-  ---
-  ```
-  `qa_verdict` is a **different field from `verdict`** above — `verdict` is
-  team-build's build-report call (GREEN/GREEN-WITH-CAVEATS/BLOCKED),
-  `qa_verdict` is team-qa's coverage call (ADEQUATE/GAPPED/BLIND, possibly
-  qualified "(pre-build)"). Extract it with
-  `grep -A1 -m1 -E '^## Coverage verdict' <qa-assessment.md> | tail -1` if a
-  `qa-assessment.md` exists for this item, else `n/a`. Without this field, a
-  re-run of `team-qa` that changes the coverage verdict but doesn't touch
-  any build-report field would look unchanged to the Step 1.5 fingerprint
-  re-check below and could wrongly downgrade the item to SKIP.
-  Fill each field from what you already verified — no extra work. Use `n/a`
-  / `null` / `"none"` for anything the item's artifacts don't have (e.g. no
-  `decisions.md`). Don't force a value onto a report that doesn't cleanly
-  state one — an honest `n/a` is what makes the safety fallback in Step 1.5
-  work correctly.
-- Write findings to `<target>/.status-scratch/<item-slug>.md` (scratch, not
-  the final report).
+The run goes silent in this session until the workflow completes — a
+background job, not a live stream — so say so before starting it. It returns
+an object (scanned/carried-forward/died counts, the recommended next action,
+any parallelization opportunity); use it in Step 4 below.
 
-### Step 3 — Synthesize + report
-Run `status-lead` with, in its launch prompt (2026-08-15 — these were
-implicit convention before; now they're the contract):
-- the triage inventory (script JSON or agent summary);
-- the scratch-file directory path — plus **each rescanned item's scanner
-  return-text**, so at large batch sizes the lead can synthesize from the
-  summaries and open only flagged items' full scratch files (see
-  status-lead.md's bounded-read rule) instead of whole-reading all N files;
-- the prior `status-report.md` path + `LAST_RUN`, and the Step 1.5
-  **SKIP/RESCAN split** (which items were re-verified this run vs. carried
-  forward);
-- the Step 1.5 **cosmetic-downgrade annotations** and any
-  **which-field-changed diffs**;
-- the path to `<target>/status-decisions.md` **if one exists from any prior
-  run** (not just this run's);
-- on a trust-cache run, the "unverified since `LAST_RUN`" item list.
-
-It writes `<target>/status-report.md` (from `templates/status-report.md`):
-**two** stage tables, in this order:
-1. **Stage-map** — every item that still has something outstanding, with
-   explicit **Intake / QA / Build / Merged** columns (never a single enum
-   label — "merged" is always its own yes/no, not folded into a phrase like
-   "build-green"). This table only ever holds items with real remaining
-   work, so it doubles as the to-do list.
-2. **Ready for Deployment** — every item that is all-four-✅
-   (Intake/QA/Build/Merged) **AND** whose merged-item follow-up type is
-   `NONE` (genuinely nothing left, not even a doc/operational/
-   future-scoping residual). **Accepted-as-is exception (2026-08-15,
-   structural 3 — third flagging of this gap since 2026-08-01):** an item
-   whose only residual is one a human has explicitly accepted — recorded as
-   a `WATCH`/`RECORD` entry in `<target>/status-decisions.md` naming that
-   finding — also graduates, with its Notes reading "residual accepted per
-   status-decisions.md <id>". Without this, an accepted `COSMETIC` residual
-   pins an item in the Stage-map forever and gets re-reported every rescan.
-   The moment an item first qualifies, it moves
-   OUT of the Stage-map and INTO this table — it never appears in both.
-   Displayed **second**, after the Stage-map, so outstanding work is what a
-   reader sees first (see the template's "Ready for Deployment" convention).
-   **"Ready for Deployment" means code-complete and merged — it is NOT the
-   same fact as "released."** Whether a client has actually been told about
-   an item is `team-release`'s ledger — the release-log the project's own
-   `PROJECT-CONTEXT.md` names; only when a project names none does it fall
-   back to the near-always-empty global
-   `team-release/memory/release-log.md`. An item can sit in this table
-   indefinitely without a release ever being cut; that's expected, not a
-   status gap — see `team-release` for shipping it. **But once the
-   release-log DOES record the item as released** (2026-08-15, structural
-   4 — closing the reverse write-back left half-open since 2026-08-01),
-   `status-lead` annotates or retires the row — "Released in `<version>`
-   per release-log" — instead of asserting "ready, not released" forever;
-   the release-log is in its input list and Step 0.5's ledger checks make
-   the flip detectable.
-
-Then a **merged-item follow-up** breakdown for every item that IS merged
-(classified `NONE` / `COSMETIC` / `DOC CLEANUP` / `OPERATIONAL` /
-`DEPENDS-ON-ITEM` / `FUTURE SCOPING` — see the template) — this is what
-determines which table an item belongs in. A **"Changed since last run"**
-element (2026-08-15 — ratifying what the lead already did by convention):
-which items flipped state vs. the prior report, using the SKIP/RESCAN split
-passed in. The reconciled true state, open
-`PENDING`/`PARKED`/`WATCH`/`DEFERRED` decisions **plus a count of entries
-flipped to `DECIDED-AUTO` since the last run**, cross-item drift, a
-**parallelization opportunity** check (whether two or
-more ready-to-build items are independent enough to run as concurrent
-`team-build` worktree efforts, laid out as an Option A: concurrent / Option
-B: sequential trade-off — never a unilateral pick), and — the point of the
-whole skill — **the single recommended next action**: *which skill to invoke
-(`team-intake` / `team-qa` / `team-build` / `librarian`), on which folder,
-and why*, citing the concrete gap. It also appends one row to the status
-run-log — **only via `scripts/add_status_run_log_row.py`, never hand-typed**
-(2026-08-15, structural 1). Pass the lead the gate answers already known at
-launch time (the Step 1.5 scan choice, any `DECIDED-AUTO` picks) for the
-row's `Gate answers` cell; gates that resolve *after* synthesis (Step 4
-proceed, parallelization, Step 4.5 corrections) get recorded by the
-orchestrator in `status-decisions.md` at Step 4.5 instead — every gate
-answer lands in exactly one of the two places, none evaporate. Capture the
-lead's headline recommendation and, if present, the parallelization choice
-verbatim.
-
-**In-flight dispatch check (2026-08-15, engineering-manager seam):** before
-finalizing any per-item recommendation, check
-`<target>/.em-state/dispatch-state.json` / `triage-state.json` (if
-present) — an item recorded there as `IN_PROGRESS`, `BLOCKED`, or
-`READY-TO-MERGE` may already have a live `engineering-manager` delegate
-working it. Flag such items **"in-flight via engineering-manager dispatch —
-do not recommend `team-build` on this item"** (recommending it invites the
-exact double-worker worktree collision the dispatch log documents). A
-stale-looking entry (old `dispatched_at`, prior session) is still worth
-naming so the reader reconciles it with `engineering-manager status`
-rather than starting a second build blind.
+**Writing back what the workflow decided:** the script never touches the
+filesystem itself. Gate answers that resolve *after* synthesis (Step 4
+proceed, parallelization, Step 4.5 corrections) are still your job to record
+in `status-decisions.md` at Step 4.5, same as before.
 
 ### Step 4 — Report back
 Present the reconciled state **in chat as plain-text tables** (ASCII-style
@@ -921,7 +802,7 @@ reciprocal-cross-reference check `status-lead` runs during synthesis.
 - **Scripts:** `~/.claude/skills/team-status/scripts/` (added 2026-08-15) —
   `check_staleness.sh` (Step 0.5), `inventory_items.py` (Step 1),
   `fingerprint_check.py` (Step 1.5), `write_fingerprint.py` (scanners,
-  Step 2), `add_status_run_log_row.py` (status-lead, Step 3),
+  Step 2), `add_status_run_log_row.py` (status-lead, Step 2),
   `check_backlinks.py` (status-lead's reciprocity sweep). Deterministic
   recipes run as scripts; agents handle the judgment residue.
 - **Memory:** the status run-log location comes from `PROJECT-CONTEXT.md` if
@@ -943,7 +824,7 @@ reciprocal-cross-reference check `status-lead` runs during synthesis.
   merged-item follow-up taxonomy (`NONE`/`COSMETIC`/`DOC CLEANUP`/
   `OPERATIONAL`/`DEPENDS-ON-ITEM`/`FUTURE SCOPING`) and stage vocabulary,
   so renaming either silently breaks it. It also dispatches builds and only
-  refreshes status after merge — hence Step 3's in-flight dispatch check.
+  refreshes status after merge — hence Step 2's in-flight dispatch check.
 - **Repo layout is project-specific — check `PROJECT-CONTEXT.md` first**, or
   discover it. Verification commands run inside the project's actual repo(s).
   **Never `Read` a `PROJECT-CONTEXT.md` whole** — the file can exceed the
