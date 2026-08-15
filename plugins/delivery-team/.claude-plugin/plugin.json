@@ -1,7 +1,7 @@
 {
   "name": "delivery-team",
   "description": "Six virtual delivery teams (intake, qa, build, release, status, decisions) that run a request through plan -> test -> build -> release, plus a read-only status reconciler and a decisions-backlog sweeper.",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "author": {
     "name": "Sara LaFleur"
   }

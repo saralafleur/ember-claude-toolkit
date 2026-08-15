@@ -2,6 +2,15 @@
 name: team-qa
 description: 'Run a virtual QA team (change-intake, coverage cartographer, risk analyst, unit-test architect, e2e-test architect, QA strategist, QA lead) over a change that was just built — on any project. Use when: code has just been written/modified and you need to know what tests to add or update so it cannot silently regress; you want to understand the current testing strategy for an area before changing it; you have a git diff, a set of changed files, or a completed team-intake technical-plan and need a test plan; or you want to know "is what we just built actually guarded, or will it ship green-but-broken?". Produces a QA assessment (the coverage verdict) and a buildable test plan, and remembers recurring coverage gaps (when the project has a defect catalog configured) so the team stops shipping the same blind spot.'
 argument-hint: '[<scope> | direct <scope>] — how to find the change + where to write, e.g. a base git ref to diff, a folder of changed files, or a completed intake folder. Optional — defaults to a git diff against the default branch if omitted. See "Run modes" for the direct token.'
+allowed-tools:
+  - Read
+  - Write
+  - Edit
+  - Grep
+  - Glob
+  - Bash
+  - Workflow
+  - Workflow(delivery-team:qa)
 ---
 
 # Team QA
@@ -45,12 +54,11 @@ below and delegate each role to a subagent. You are the QA lead.
 > and `~/.claude/agents/<name>.md` means "the matching file in this plugin's
 > own `agents/` folder" — same relative layout, different root.
 
-> **How to invoke each role:** these are registered subagent types — launch each
-> with `subagent_type: "<name>"` (e.g. `subagent_type: "qa-coverage-cartographer"`).
-> Always give the agent: the `change-brief.md` path, the output dir, and (once
-> known) the coverage verdict. (If a name isn't available as a subagent type, fall
-> back to a `general-purpose` agent and paste the role brief from
-> `~/.claude/agents/<name>.md`.)
+> **How the team actually runs:** `qa-triage` through `qa-lead` (everything in
+> Steps 1–4) run inside one `Workflow` call — `workflows/qa.js` — not as
+> `Agent` calls you make directly; the script invokes each by its registered
+> subagent type (`agentType: "<name>"`, e.g. `"qa-coverage-cartographer"`)
+> and reuses these same agent files unchanged.
 
 ## Run modes
 
@@ -65,7 +73,7 @@ either way):
 
 | Mode | Token | What changes |
 |---|---|---|
-| Direct | `direct` | Right after Step 1's `qa-triage` returns `READY`, run `director-of-engineering` with this skill's own roster (the table under "The team") instead of the fixed Step 2 fan-out; execute exactly the agents/order it returns in place of Steps 2–4. Still runs straight through with no pause. |
+| Direct | `direct` | Right after triage returns `READY`, the pipeline (Step 1's `Workflow` call) runs `director-of-engineering` with this skill's own roster (the table under "The team") instead of the fixed evaluation fan-out; it runs exactly the agents/order the director returns in place of the fixed roster. Still runs straight through with no pause. |
 
 Every decision point in "Process" below resolves one of three ways, never a
 stop-and-wait:
@@ -128,72 +136,64 @@ scope.
 short kebab-case slug from the change). Create a `supporting/` subfolder inside it.
 Use today's date. **Never write plans to a repo root.**
 
-### Step 1 — Change-intake (gate)
-Run `qa-triage` on the scope source → it writes `change-brief.md` and returns a
-`READY` / `BLOCKED` verdict.
+### Step 1 — Run the QA pipeline
 
-**If `direct` was requested:** once triage returns `READY`, run
-`director-of-engineering` now with this skill's own roster (the table under
-"The team") instead of the fixed Step 2 fan-out below — it writes
-`run-plan.md`; execute exactly the agents/order it returns in place of
-Steps 2–4.
+Triage runs first, by itself, since its `READY`/`BLOCKED` verdict decides
+whether anything else runs at all:
 
-**If `BLOCKED`** (e.g. no actual change found, can't determine the diff base,
-a changed file references something that doesn't exist): **do not plan tests
-for a change nobody has pinned down, and do not ask** — there is no default
-scope to guess at that would make the rest of the pipeline meaningful.
-Instead:
-- Log the blocking question(s) to `decisions.md` as `PENDING` (see "Decision
-  logging") — an open item for whenever a human looks, not something this
-  run waits on.
-- Report plainly (this run's version of Step 5): what was checked, exactly
-  why it's BLOCKED, and what would resolve it.
-- **End the run here.** Steps 2–5's normal flow (evaluate, strategist, test
-  plan, team-build hand-off) do not execute against an undefined change.
+```
+Workflow({
+  scriptPath: "~/.claude/skills/team-qa/workflows/qa.js",
+  args: {
+    changeBriefPath: "<output-dir>/change-brief.md",
+    supportingDir: "<output-dir>/supporting",
+    scope: "<the resolved scope from Step 0>",
+    mode: "standard" | "direct"
+  }
+})
+```
 
-If **READY**, continue to Step 2.
+(Under a plugin install, `scriptPath` is
+`${CLAUDE_PLUGIN_ROOT}/skills/team-qa/workflows/qa.js` instead — same "Path
+note" translation as everywhere else in this file.)
 
-### Step 2 — Evaluate (staged fan-out)
-This step runs in two waves, not one flat fan-out — the second wave needs the
-first wave's output as an input:
+This one call replaces what used to be four separate steps — change-intake,
+the staged two-wave evaluation fan-out, the strategist, and the lead. The
+mechanics described in the old Steps 1–4 are all still true, just executed
+by the script now instead of by you:
+- **`qa-triage`** writes `change-brief.md` and returns `READY`/`BLOCKED`.
+  **If `BLOCKED`**, the script does not run anything else — it returns
+  `{blocked: true, reason}` immediately. Do not plan tests for a change
+  nobody has pinned down: log the blocking question to `decisions.md` as
+  `PENDING` (see "Decision logging"), report plainly what was checked and
+  why it's `BLOCKED`, and stop — do not proceed to `team-build`.
+- **If `direct` was requested**, `director-of-engineering` runs right after
+  triage, with this skill's own roster (the table under "The team"), and
+  trims which of the remaining six agents actually run.
+- **The evaluation fan-out runs in two waves**, not one flat fan-out — wave 2
+  (`qa-unit-architect`, `qa-e2e-architect`) is fed wave 1's named
+  "ships-green-but-broken" traps (with their stable ids) from `risk.md`, so
+  the architects design tests against real traps instead of re-deriving risk
+  analysis from scratch.
+- **`qa-strategist`** sets the coverage verdict (ADEQUATE/GAPPED/BLIND),
+  diagnoses test-debt, writes `qa-assessment.md`, and updates the QA run-log
+  + recurring-issue catalog + (if `BLIND` and scope came from an intake
+  hand-off) the source `technical-plan.md`'s Risks & rollback section — all
+  via its own `Write`/`Bash` tools, unchanged.
+- **`qa-lead`** synthesizes everything into `test-plan.md`.
 
-**Step 2a — launch these two agents in parallel** (one message, multiple tool
-calls; neither depends on the other). Give each the `change-brief.md` path
-and the `supporting/` output path:
-- `qa-coverage-cartographer` → `supporting/coverage.md`
-- `qa-risk-analyst` → `supporting/risk.md`
+The run goes silent in this session until the workflow completes — a
+background job, not a live stream — so say so before starting it. It returns
+an object; use it in Step 5 below.
 
-**Step 2b — once `risk.md` exists, launch these two agents in parallel.**
-Give each the `change-brief.md` path, `supporting/risk.md`, and the
-`supporting/` output path:
-- `qa-unit-architect` → `supporting/unit-tests.md`
-- `qa-e2e-architect` → `supporting/e2e-tests.md`
-
-(This split exists because the two architects need `risk.md`'s named
-"ships-green-but-broken" traps — with their stable ids — to design tests
-against; running all four at once left them re-deriving risk analysis from
-scratch and silently dropping traps, a recurring failure `qa-strategist`
-flagged across multiple real runs before this staging existed.)
-
-### Step 3 — QA Strategist
-Run `qa-strategist`. It reads the brief + four supporting files + **this
-project's recurring-issue memory (if configured)** + the QA run-log
-(`grep`-scoped by project, never a full `Read` — see its own role file),
-sets the coverage verdict (ADEQUATE/GAPPED/BLIND, qualified with "(pre-build)
-→ projected X once built" when evaluating a plan rather than merged code),
-diagnoses the test-debt, writes `qa-assessment.md`, and updates the QA
-run-log via its append script (and this project's recurring-issue catalog if
-it has one and this run exposed/matched a recurring gap; and the source
-`technical-plan.md`'s Risks & rollback section if the verdict is BLIND and
-scope came from an intake hand-off). Capture its **coverage verdict** — the
-lead needs it.
-
-### Step 4 — Test plan
-Run `qa-lead` with the brief, the four supporting files, and the strategist's
-verdict → it writes `test-plan.md`.
+**Writing back what the workflow decided:** the script never touches the
+filesystem itself. `decisions.md` is your job, same as before — a
+`BLOCKED` reason logged as `PENDING`, or a genuine preference point logged as
+`DECIDED-AUTO` (see "Decision logging").
 
 ### Step 5 — Report back
-Summarize for the user in chat:
+Read the workflow's return value first (`coverageVerdict`, `matchedRecurringGap`,
+`leadSummary`, `ranAgents`/`skippedAgents`), then summarize for the user in chat:
 - **Coverage verdict** (ADEQUATE / GAPPED / BLIND) and the surfaces touched.
 - **"Seen this gap class before?"** (cite this project's defect-catalog id if matched).
 - The strategist's headline recommendation (must-add-now tests vs the durable cure).
