@@ -34,6 +34,17 @@ const TRIAGE_SCHEMA = {
     verdict: { type: 'string', enum: ['READY', 'BLOCKED'] },
     blockedReason: { type: 'string' },
     changeBriefWritten: { type: 'boolean' },
+    catalogDigest: {
+      type: 'object',
+      description: 'optional -- the run-local defect-catalog digest, per substrate-core/references/catalog-digest.md. Omit entirely if the project has no catalog configured.',
+      properties: {
+        configured: { type: 'boolean' },
+        rows: { type: 'string', description: 'the pre-rendered digest block (STATE B or STATE C text)' },
+        surfacesResolved: { type: 'array', items: { type: 'string' } },
+        surfacesUnresolved: { type: 'array', items: { type: 'string' } },
+        artifactPath: { type: 'string' },
+      },
+    },
   },
 }
 
@@ -122,7 +133,7 @@ const LEAD_SCHEMA = {
 
 phase('Change-intake')
 const triage = await agent(
-  `Ingest the change scope (${scope}) into a change brief at ${changeBriefPath} -- name the surfaces touched and the test-invariants at risk.`,
+  `Ingest the change scope (${scope}) into a change brief at ${changeBriefPath} -- name the surfaces touched and the test-invariants at risk. If this project has a defect catalog configured, resolve and run the digest per substrate-core/references/catalog-digest.md and return it as catalogDigest.`,
   { agentType: 'qa-triage', label: 'triage', phase: 'Change-intake', schema: TRIAGE_SCHEMA },
 )
 if (!triage) throw new Error('qa-triage died or was skipped')
@@ -153,14 +164,19 @@ if (isDirect) {
 // ---- Phase: Evaluate wave 1 (coverage + risk, parallel) -------------------
 
 phase('Evaluate wave 1')
+// Additive, locator-only -- see substrate-core/references/catalog-digest.md.
+// Absent/not-configured produces '', never a new checker role.
+const catalogDigestBlock = (triage.catalogDigest && triage.catalogDigest.configured)
+  ? `\n\n${triage.catalogDigest.rows || `Defect-catalog digest for this run: CONFIGURED, 0 of ${(triage.catalogDigest.surfacesUnresolved || []).length} surface(s) resolved. Unresolved: ${(triage.catalogDigest.surfacesUnresolved || []).join(', ') || 'none'}. Artifact: ${triage.catalogDigest.artifactPath || 'n/a'}. Treat this as UNKNOWN, not as "no known trap applies".`}`
+  : ''
 const wave1 = {}
 await parallel([
   runSet.has('qa-coverage-cartographer') ? () => agent(
-    `Map EXISTING test coverage for the surfaces touched by the change at ${changeBriefPath}, across every layer this project tests at. Run the relevant suites and record the current green/red baseline. Write ${supportingDir}/coverage.md.`,
+    `Map EXISTING test coverage for the surfaces touched by the change at ${changeBriefPath}, across every layer this project tests at. Run the relevant suites and record the current green/red baseline. Write ${supportingDir}/coverage.md.${catalogDigestBlock}`,
     { agentType: 'qa-coverage-cartographer', label: 'coverage', phase: 'Evaluate wave 1', schema: COVERAGE_SCHEMA },
   ).then(r => { wave1.coverage = r }) : () => Promise.resolve(),
   runSet.has('qa-risk-analyst') ? () => agent(
-    `Evaluate blast radius and name "ships-green-but-broken" traps (each with a stable id) for the change at ${changeBriefPath}. Write ${supportingDir}/risk.md.`,
+    `Evaluate blast radius and name "ships-green-but-broken" traps (each with a stable id) for the change at ${changeBriefPath}. Write ${supportingDir}/risk.md.${catalogDigestBlock}`,
     { agentType: 'qa-risk-analyst', label: 'risk', phase: 'Evaluate wave 1', schema: RISK_SCHEMA },
   ).then(r => { wave1.risk = r }) : () => Promise.resolve(),
 ])
@@ -174,11 +190,11 @@ const trapsBlock = wave1.risk && Array.isArray(wave1.risk.traps) && wave1.risk.t
 const wave2 = {}
 await parallel([
   runSet.has('qa-unit-architect') ? () => agent(
-    `Design unit/parity/component tests for the change at ${changeBriefPath}.${trapsBlock} Write ${supportingDir}/unit-tests.md.`,
+    `Design unit/parity/component tests for the change at ${changeBriefPath}.${trapsBlock} Write ${supportingDir}/unit-tests.md.${catalogDigestBlock}`,
     { agentType: 'qa-unit-architect', label: 'unit', phase: 'Evaluate wave 2', schema: UNIT_SCHEMA },
   ).then(r => { wave2.unit = r }) : () => Promise.resolve(),
   runSet.has('qa-e2e-architect') ? () => agent(
-    `Design e2e/API tests for the change at ${changeBriefPath}.${trapsBlock} Write ${supportingDir}/e2e-tests.md.`,
+    `Design e2e/API tests for the change at ${changeBriefPath}.${trapsBlock} Write ${supportingDir}/e2e-tests.md.${catalogDigestBlock}`,
     { agentType: 'qa-e2e-architect', label: 'e2e', phase: 'Evaluate wave 2', schema: E2E_SCHEMA },
   ).then(r => { wave2.e2e = r }) : () => Promise.resolve(),
 ])
@@ -189,7 +205,7 @@ let strategist = null
 if (runSet.has('qa-strategist')) {
   phase('Strategist')
   strategist = await agent(
-    `Set the coverage verdict, diagnose test-debt, and write qa-assessment.md for the change at ${changeBriefPath}, using whichever of the four supporting findings ran, plus this project's recurring-issue memory if configured.`,
+    `Set the coverage verdict, diagnose test-debt, and write qa-assessment.md for the change at ${changeBriefPath}, using whichever of the four supporting findings ran, plus this project's recurring-issue memory if configured.${catalogDigestBlock}`,
     { agentType: 'qa-strategist', label: 'strategist', phase: 'Strategist', schema: STRATEGIST_SCHEMA },
   )
 }
@@ -200,7 +216,7 @@ let lead = null
 if (runSet.has('qa-lead')) {
   phase('Lead')
   lead = await agent(
-    `Synthesize the supporting findings and the strategist's verdict${strategist ? ` (${strategist.verdict})` : ' (none -- qa-strategist did not run this pass)'} into a buildable test-plan.md for the change at ${changeBriefPath}.`,
+    `Synthesize the supporting findings and the strategist's verdict${strategist ? ` (${strategist.verdict})` : ' (none -- qa-strategist did not run this pass)'} into a buildable test-plan.md for the change at ${changeBriefPath}.${catalogDigestBlock}`,
     { agentType: 'qa-lead', label: 'lead', phase: 'Lead', schema: LEAD_SCHEMA },
   )
 }

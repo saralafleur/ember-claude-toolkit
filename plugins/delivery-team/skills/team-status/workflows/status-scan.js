@@ -40,6 +40,7 @@ const SCANNER_SCHEMA = {
     openDecisions: { type: 'array', items: { type: 'string' } },
     crossItemDrift: { type: 'array', items: { type: 'string' } },
     catalogIdsCited: { type: 'array', items: { type: 'string' } },
+    catalogDigestState: { type: 'string', enum: ['not-configured', 'zero-resolved', 'resolved'], description: 'optional -- the three-state defect-catalog digest signal for this item, per substrate-core/references/catalog-digest.md' },
   },
 }
 
@@ -72,7 +73,12 @@ function scannerPrompt(item) {
   const batchWideBlock = batchWideFindings
     ? `\n\nKnown batch-wide findings from the prior report -- confirm or contradict in one command, don't re-derive:\n${typeof batchWideFindings === 'string' ? batchWideFindings : JSON.stringify(batchWideFindings)}`
     : ''
-  return `Reconcile intent vs. last-reported state for the work item at ${item.path} (slug: ${item.slug}). Re-verify every load-bearing claim against the live code -- re-run cited tests, grep cited files, check cited endpoints. Classify the stage and flag drift. Write scratch findings to ${targetDir}/.status-scratch/${item.slug}.md, then write the fingerprint frontmatter via write_fingerprint.py per this skill's own convention.${fieldChangedBlock}${decisionsBlock}${batchWideBlock}`
+  // Additive, locator-only, per item -- see substrate-core/references/
+  // catalog-digest.md. Each scanner resolves and runs the digest for its
+  // OWN item (no run-level pre-fan-out artifact, no new agent() call site);
+  // silently a no-op if the project has no tools/catalog/scan_catalog.py.
+  const catalogDigestBlock = `\n\nIf this project has a defect catalog configured, resolve and run the digest for this item's own cited files per substrate-core/references/catalog-digest.md (canonical; do not re-derive or paste a copy here). Write the result to ${targetDir}/.status-scratch/${item.slug}-catalog-digest.md, merge resolved ids into catalogIdsCited, and report the three-state signal as catalogDigestState. Skip silently if the project has no catalog configured.`
+  return `Reconcile intent vs. last-reported state for the work item at ${item.path} (slug: ${item.slug}). Re-verify every load-bearing claim against the live code -- re-run cited tests, grep cited files, check cited endpoints. Classify the stage and flag drift. Write scratch findings to ${targetDir}/.status-scratch/${item.slug}.md, then write the fingerprint frontmatter via write_fingerprint.py per this skill's own convention.${fieldChangedBlock}${decisionsBlock}${batchWideBlock}${catalogDigestBlock}`
 }
 
 let scanResults = []
@@ -98,8 +104,15 @@ if (diedCount > 0) log(`${diedCount} of ${items.length} scanner(s) died or were 
 // ---- Phase: Synthesize -------------------------------------------------------
 
 phase('Synthesize')
+// Union of every scanner's own catalogIdsCited (which per-item digest
+// resolution already folds into) -- the "thread it down the pipeline" half
+// for this skill. Additive, locator-only; empty union produces ''.
+const unionCatalogIds = [...new Set(scanned.flatMap(s => s.catalogIdsCited || []))]
+const leadCatalogBlock = unionCatalogIds.length
+  ? `\n\nDefect-catalog ids cited across this run's scanned items (locator-only; read the cited line ranges in the catalog body for detail -- you do not need permission to go past this list, and its absence is never by itself evidence that no known trap applies): ${unionCatalogIds.join(', ')}`
+  : ''
 const lead = await agent(
-  `Merge these scanner findings and the carried-forward cached items into ${reportPath} -- the full stage-map (Intake/QA/Build/Merged columns) plus the Ready-for-Deployment table, report-vs-reality discrepancies, open decisions, cross-item drift, a parallelization-opportunity check, the in-flight engineering-manager dispatch check, and the single recommended next action. Triage inventory: ${typeof triageInventory === 'string' ? triageInventory : JSON.stringify(triageInventory)}\n\nFreshly scanned: ${scanned.map(s => s.slug).join(', ') || '(none)'}\nCarried forward from cache: ${skippedItems.map(s => `${s.slug} (${s.reason || 'unchanged'})`).join(', ') || '(none)'}\nDied/unscanned: ${items.filter(i => !scanned.find(s => s.slug === i.slug)).map(i => i.slug).join(', ') || '(none)'}${cosmeticDowngradeAnnotations.length ? `\nCosmetic-downgrade annotations (surface these, don't hide them): ${cosmeticDowngradeAnnotations.join('; ')}` : ''}${unverifiedSinceLastRun.length ? `\nUnverified since ${lastRun || 'last run'} (trust-cache branch, flag in stage-map Notes and the overall verdict line): ${unverifiedSinceLastRun.join(', ')}` : ''}${priorReportPath ? `\nPrior report: ${priorReportPath}${lastRun ? ` (as of ${lastRun})` : ''}` : ''}`,
+  `Merge these scanner findings and the carried-forward cached items into ${reportPath} -- the full stage-map (Intake/QA/Build/Merged columns) plus the Ready-for-Deployment table, report-vs-reality discrepancies, open decisions, cross-item drift, a parallelization-opportunity check, the in-flight engineering-manager dispatch check, and the single recommended next action. Triage inventory: ${typeof triageInventory === 'string' ? triageInventory : JSON.stringify(triageInventory)}\n\nFreshly scanned: ${scanned.map(s => s.slug).join(', ') || '(none)'}\nCarried forward from cache: ${skippedItems.map(s => `${s.slug} (${s.reason || 'unchanged'})`).join(', ') || '(none)'}\nDied/unscanned: ${items.filter(i => !scanned.find(s => s.slug === i.slug)).map(i => i.slug).join(', ') || '(none)'}${cosmeticDowngradeAnnotations.length ? `\nCosmetic-downgrade annotations (surface these, don't hide them): ${cosmeticDowngradeAnnotations.join('; ')}` : ''}${unverifiedSinceLastRun.length ? `\nUnverified since ${lastRun || 'last run'} (trust-cache branch, flag in stage-map Notes and the overall verdict line): ${unverifiedSinceLastRun.join(', ')}` : ''}${priorReportPath ? `\nPrior report: ${priorReportPath}${lastRun ? ` (as of ${lastRun})` : ''}` : ''}${leadCatalogBlock}`,
   { agentType: 'status-lead', label: 'lead', phase: 'Synthesize', schema: LEAD_SCHEMA },
 )
 if (!lead) throw new Error('status-lead died or was skipped -- no status-report.md was written')

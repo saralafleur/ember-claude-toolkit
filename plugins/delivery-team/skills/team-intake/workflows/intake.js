@@ -38,6 +38,17 @@ const TRIAGE_SCHEMA = {
   properties: {
     verdict: { type: 'string', enum: ['READY', 'BLOCKED'] },
     briefWritten: { type: 'boolean', description: 'true once request-brief.md has been written to briefPath, including the Scout digest' },
+    catalogDigest: {
+      type: 'object',
+      description: 'optional -- the run-local defect-catalog digest, per substrate-core/references/catalog-digest.md. Omit entirely if the project has no catalog configured.',
+      properties: {
+        configured: { type: 'boolean' },
+        rows: { type: 'string', description: 'the pre-rendered digest block (STATE B or STATE C text)' },
+        surfacesResolved: { type: 'array', items: { type: 'string' } },
+        surfacesUnresolved: { type: 'array', items: { type: 'string' } },
+        artifactPath: { type: 'string' },
+      },
+    },
     blockingQuestions: {
       type: 'array',
       items: {
@@ -132,7 +143,7 @@ const TECHLEAD_SCHEMA = {
 
 phase('Triage')
 const triage = await agent(
-  `Ingest the request materials under ${intakeDir} into a normalized request brief. Write it to ${briefPath}, including a Scout digest (stack, layout, test commands, candidate files, relevant defect-catalog entries) so downstream evaluators don't re-derive it.${watchBlock}`,
+  `Ingest the request materials under ${intakeDir} into a normalized request brief. Write it to ${briefPath}, including a Scout digest (stack, layout, test commands, candidate files, relevant defect-catalog entries) so downstream evaluators don't re-derive it. If this project has a defect catalog configured, resolve and run the digest per substrate-core/references/catalog-digest.md and return it as catalogDigest.${watchBlock}`,
   { agentType: 'intake-triage', label: 'triage', phase: 'Triage', schema: TRIAGE_SCHEMA },
 )
 if (!triage) throw new Error('intake-triage died or was skipped -- cannot proceed without a brief')
@@ -154,6 +165,13 @@ for (const q of triage.nonBlockingAssumptions || []) {
 
 const assumptionsBlock = adoptedAssumptions.length
   ? `\n\nAssumptions adopted in lieu of an answer (treat as settled context for this run):\n${adoptedAssumptions.map(a => `- ${a.question} -> ${a.adopted}`).join('\n')}`
+  : ''
+
+// Additive, locator-only -- see substrate-core/references/catalog-digest.md.
+// Absent/not-configured produces '', never a new checker role or a second
+// producer of this artifact (Override 1 in the technical plan).
+const catalogDigestBlock = (triage.catalogDigest && triage.catalogDigest.configured)
+  ? `\n\n${triage.catalogDigest.rows || `Defect-catalog digest for this run: CONFIGURED, 0 of ${(triage.catalogDigest.surfacesUnresolved || []).length} surface(s) resolved. Unresolved: ${(triage.catalogDigest.surfacesUnresolved || []).join(', ') || 'none'}. Artifact: ${triage.catalogDigest.artifactPath || 'n/a'}. Treat this as UNKNOWN, not as "no known trap applies".`}`
   : ''
 
 // ---- Phase: Direct-mode routing (director-of-engineering) ---------------
@@ -188,7 +206,7 @@ const EVALUATORS = [
 
 const evalResults = await parallel(EVALUATORS.map(e => () =>
   agent(
-    `${e.brief} Start from the brief's Scout digest at ${briefPath} instead of re-deriving stack/layout/test-command facts -- your judgment stays independent, the discovery is paid once by triage. Write your findings to ${supportingDir}/${e.file}.${assumptionsBlock}`,
+    `${e.brief} Start from the brief's Scout digest at ${briefPath} instead of re-deriving stack/layout/test-command facts -- your judgment stays independent, the discovery is paid once by triage. Write your findings to ${supportingDir}/${e.file}.${assumptionsBlock}${catalogDigestBlock}`,
     { agentType: e.agentType, label: e.agentType, phase: 'Evaluate', schema: EVAL_SCHEMA },
   ).then(r => ({ agentType: e.agentType, result: r })),
 ))
@@ -198,7 +216,7 @@ const evalResults = await parallel(EVALUATORS.map(e => () =>
 phase('Project Manager')
 const supportingSummaries = evalResults.filter(r => r.result).map(r => `${r.agentType}: ${r.result.summary}`).join('\n')
 const pm = await agent(
-  `Classify this request's true type, reconstruct history (have we seen this before?) using PM memory, and write pm-plan.md. Brief: ${briefPath}. Supporting findings summaries:\n${supportingSummaries || '(none ran -- direct mode skipped the whole evaluation fan-out)'}${assumptionsBlock}`,
+  `Classify this request's true type, reconstruct history (have we seen this before?) using PM memory, and write pm-plan.md. Brief: ${briefPath}. Supporting findings summaries:\n${supportingSummaries || '(none ran -- direct mode skipped the whole evaluation fan-out)'}${assumptionsBlock}${catalogDigestBlock}`,
   { agentType: 'intake-project-manager', label: 'pm', phase: 'Project Manager', schema: PM_SCHEMA },
 )
 if (!pm) throw new Error('intake-project-manager died or was skipped -- this role is never optional')
@@ -209,7 +227,7 @@ let techLead = null
 if (runSet.has('intake-tech-lead')) {
   phase('Tech Lead')
   techLead = await agent(
-    `Merge the architect/engineer/QA findings (whichever ran) into technical-plan.md, using the PM's request type (${pm.requestType}) as context. Brief: ${briefPath}. Supporting findings:\n${supportingSummaries || '(none ran)'}`,
+    `Merge the architect/engineer/QA findings (whichever ran) into technical-plan.md, using the PM's request type (${pm.requestType}) as context. Brief: ${briefPath}. Supporting findings:\n${supportingSummaries || '(none ran)'}${catalogDigestBlock}`,
     { agentType: 'intake-tech-lead', label: 'tech-lead', phase: 'Tech Lead', schema: TECHLEAD_SCHEMA },
   )
 }

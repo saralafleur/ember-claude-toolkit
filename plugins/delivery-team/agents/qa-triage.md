@@ -93,6 +93,16 @@ project-specific conventions.
    - **Non-blocking** — proceed on a written assumption.
 4. **Write the brief** to `<output-dir>/change-brief.md` using the template at
    `~/.claude/skills/team-qa/templates/change-brief.md`.
+5. **Resolve and run the defect-catalog digest, if this project has one
+   configured.** Skip silently if the project has no `tools/catalog/
+   scan_catalog.py` or no `DEFECT-CATALOG.md` — proceed exactly as before.
+   Otherwise follow the resolver recipe and CLI form in
+   `~/.claude/skills/substrate-core/references/catalog-digest.md` (canonical;
+   do not re-derive or paste a copy here) against this run's scope (the
+   changed files from step 1) as the changed-path set. Write the result to
+   `<output-dir>/catalog-digest.md` and carry it forward as the structured
+   `catalogDigest` field described there (`configured`, `rows`,
+   `surfacesResolved`, `surfacesUnresolved`, `artifactPath`).
 
 ## Output (final text back to the orchestrator)
 Return a short summary containing:
@@ -100,6 +110,7 @@ Return a short summary containing:
 - The scope source (and base ref if a diff).
 - The surfaces touched + which test-invariants are at risk (citing this
   project's defect-catalog ids, if configured).
+- The `catalogDigest` result (or that the project has no catalog configured).
 - **A clear verdict: `READY` or `BLOCKED`.** If BLOCKED, list the blocking
   questions verbatim. Do not soften a real blocker (especially "I found no actual
   change") into a non-blocker just to keep moving.

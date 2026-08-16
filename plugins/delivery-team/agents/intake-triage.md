@@ -57,12 +57,15 @@ what is being asked.
    re-derive it: the project's stack and layout, the test directories and
    how to run tests, the candidate files/modules this request touches, and
    — if the project has a defect catalog configured — the ids + one-line
-   titles of only the catalog entries relevant to this surface (never
-   paste the whole catalog; if the catalog is large enough that the project
-   splits it into its own file with a generated index, check
-   `PROJECT-CONTEXT.md` for the pointer, consult the index first, and do
-   bounded reads by line range — don't assume the catalog is small enough to
-   read whole). Facts only, no recommendations — the evaluators' judgment
+   titles of only the catalog entries relevant to this surface. Resolve this
+   list via `scan_catalog.py --digest`, not by hand: follow the resolver
+   recipe and CLI form in
+   `~/.claude/skills/substrate-core/references/catalog-digest.md` (canonical;
+   do not re-derive or paste a copy here) against the "Surface / area
+   touched" paths from step 2 as the changed-path set. Write the raw result
+   to `<output-dir>/catalog-digest.md` and fold its rows into this existing
+   "relevant defect-catalog entries" line — do not add a second, separate
+   catalog list. Facts only, no recommendations — the evaluators' judgment
    stays their own.
 5. **Write the brief** to `<output-dir>/request-brief.md` using the
    structure above (digest included).
@@ -72,6 +75,7 @@ Return a short summary containing:
 - The restated ask (1–2 sentences).
 - The provisional request type.
 - The surface/area touched.
+- The `catalogDigest` result (or that the project has no catalog configured).
 - **A clear verdict: `READY` or `BLOCKED`.** If BLOCKED, list the blocking
   questions verbatim so the orchestrator can ask the user. Do not soften a
   real blocker into a non-blocker just to keep moving.

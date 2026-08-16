@@ -45,6 +45,17 @@ const TRIAGE_SCHEMA = {
       items: { type: 'object', properties: { repo: { type: 'string' }, path: { type: 'string' }, branch: { type: 'string' }, startingCommit: { type: 'string' } } },
     },
     autoStashedRepos: { type: 'array', items: { type: 'string' }, description: 'repos where a dirty tree was auto-stashed (git stash -u) before provisioning proceeded' },
+    catalogDigest: {
+      type: 'object',
+      description: 'optional -- the run-local defect-catalog digest, per substrate-core/references/catalog-digest.md. Omit entirely if the project has no catalog configured.',
+      properties: {
+        configured: { type: 'boolean' },
+        rows: { type: 'string', description: 'the pre-rendered digest block (STATE B or STATE C text)' },
+        surfacesResolved: { type: 'array', items: { type: 'string' } },
+        surfacesUnresolved: { type: 'array', items: { type: 'string' } },
+        artifactPath: { type: 'string' },
+      },
+    },
   },
 }
 
@@ -113,7 +124,7 @@ const LEAD_SCHEMA = {
 
 phase('Triage')
 const triage = await agent(
-  `Confirm ${technicalPlanPath} and ${testPlanPath} are present and buildable, discover this project's repo layout, provision a per-effort worktree set (+ namespaced Docker stack, if this project has one), confirm each worktree is clean (auto-stash any dirty tree with 'git stash -u', never ask), record the starting commit per repo, and write build-brief.md under ${buildDir}.`,
+  `Confirm ${technicalPlanPath} and ${testPlanPath} are present and buildable, discover this project's repo layout, provision a per-effort worktree set (+ namespaced Docker stack, if this project has one), confirm each worktree is clean (auto-stash any dirty tree with 'git stash -u', never ask), record the starting commit per repo, and write build-brief.md under ${buildDir}. If this project has a defect catalog configured, resolve and run the digest per substrate-core/references/catalog-digest.md and return it as catalogDigest.`,
   { agentType: 'build-triage', label: 'triage', phase: 'Triage', schema: TRIAGE_SCHEMA },
 )
 if (!triage) throw new Error('build-triage died or was skipped')
@@ -133,12 +144,17 @@ const worktreesBlock = (triage.worktrees || []).length
   ? `\n\nThis effort's worktree(s) -- work ONLY inside these, never any other checkout:\n${(triage.worktrees || []).map(w => `- ${w.repo}: ${w.path} (branch ${w.branch}, starting commit ${w.startingCommit})`).join('\n')}`
   : `\n\n(build-triage returned no worktree list -- if you cannot find this effort's own isolated worktree from build-brief.md under ${buildDir}, stop and report BLOCKED rather than guessing at a repo.)`
 const buildDirBlock = `\n\nBuild artifacts directory: ${buildDir}`
+// Additive, locator-only -- see substrate-core/references/catalog-digest.md.
+// Absent/not-configured produces '', never a new checker role.
+const catalogDigestBlock = (triage.catalogDigest && triage.catalogDigest.configured)
+  ? `\n\n${triage.catalogDigest.rows || `Defect-catalog digest for this run: CONFIGURED, 0 of ${(triage.catalogDigest.surfacesUnresolved || []).length} surface(s) resolved. Unresolved: ${(triage.catalogDigest.surfacesUnresolved || []).join(', ') || 'none'}. Artifact: ${triage.catalogDigest.artifactPath || 'n/a'}. Treat this as UNKNOWN, not as "no known trap applies".`}`
+  : ''
 
 // ---- Phase: Plan -----------------------------------------------------------
 
 phase('Plan')
 const plan = await agent(
-  `Turn ${technicalPlanPath} + ${testPlanPath} + build-brief.md into one ordered, dependency-correct build-task-list.md under ${buildDir}. Mark every durable-cure step this project's defect catalog (if configured) calls for as MANDATORY, citing the catalog id.${worktreesBlock}${buildDirBlock}`,
+  `Turn ${technicalPlanPath} + ${testPlanPath} + build-brief.md into one ordered, dependency-correct build-task-list.md under ${buildDir}. Mark every durable-cure step this project's defect catalog (if configured) calls for as MANDATORY, citing the catalog id.${worktreesBlock}${buildDirBlock}${catalogDigestBlock}`,
   { agentType: 'build-planner', label: 'planner', phase: 'Plan', schema: PLAN_SCHEMA },
 )
 if (!plan) throw new Error('build-planner died or was skipped')
@@ -147,7 +163,7 @@ if (!plan) throw new Error('build-planner died or was skipped')
 
 phase('Red')
 const red = await agent(
-  `Write the tests named in ${testPlanPath}, run them, and prove each one RED against the current unbuilt code. Test files only -- no product code.${worktreesBlock}${buildDirBlock}`,
+  `Write the tests named in ${testPlanPath}, run them, and prove each one RED against the current unbuilt code. Test files only -- no product code.${worktreesBlock}${buildDirBlock}${catalogDigestBlock}`,
   { agentType: 'build-test-author', label: 'test-author', phase: 'Red', schema: TESTAUTHOR_SCHEMA },
 )
 if (!red) throw new Error('build-test-author died or was skipped')
@@ -167,12 +183,12 @@ while (cycle < MAX_CYCLES) {
   phase('Implement + Verify + Review')
 
   await agent(
-    `Work build-task-list.md in order, applying the change set from ${technicalPlanPath} to make the red tests pass (cycle ${cycle} of up to ${MAX_CYCLES}). Apply any structural cure the plan marked MANDATORY -- no inline shortcut. One implementer, sequential, no parallel edits.${priorFindingsBlock}${worktreesBlock}${buildDirBlock}`,
+    `Work build-task-list.md in order, applying the change set from ${technicalPlanPath} to make the red tests pass (cycle ${cycle} of up to ${MAX_CYCLES}). Apply any structural cure the plan marked MANDATORY -- no inline shortcut. One implementer, sequential, no parallel edits.${priorFindingsBlock}${worktreesBlock}${buildDirBlock}${catalogDigestBlock}`,
     { agentType: 'build-implementer', label: `implementer:${cycle}`, phase: 'Implement + Verify + Review', schema: IMPLEMENTER_SCHEMA },
   )
 
   verify = await agent(
-    `Bring up this effort's own isolated Docker stack (if this project has one and scope needs it), run the full relevant suites, confirm each new test went red-to-green, and run the Definition of Done plus any standing guards this project's defect catalog calls for.${worktreesBlock}${buildDirBlock}`,
+    `Bring up this effort's own isolated Docker stack (if this project has one and scope needs it), run the full relevant suites, confirm each new test went red-to-green, and run the Definition of Done plus any standing guards this project's defect catalog calls for.${worktreesBlock}${buildDirBlock}${catalogDigestBlock}`,
     { agentType: 'build-verifier', label: `verifier:${cycle}`, phase: 'Implement + Verify + Review', schema: VERIFIER_SCHEMA },
   )
   if (!verify || verify.status !== 'GREEN') {
@@ -186,7 +202,7 @@ while (cycle < MAX_CYCLES) {
   }
 
   review = await agent(
-    `Review the diff since the starting commit, per touched repo, against this project's known traps (if it has a defect catalog configured) plus ordinary correctness/simplification.${worktreesBlock}${buildDirBlock}`,
+    `Review the diff since the starting commit, per touched repo, against this project's known traps (if it has a defect catalog configured) plus ordinary correctness/simplification.${worktreesBlock}${buildDirBlock}${catalogDigestBlock}`,
     { agentType: 'build-reviewer', label: `reviewer:${cycle}`, phase: 'Implement + Verify + Review', schema: REVIEWER_SCHEMA },
   )
   if (!review) throw new Error(`build-reviewer died or was skipped on cycle ${cycle}`)
@@ -210,7 +226,7 @@ if (review && review.realDefect) {
 
 phase('Ship')
 const lead = await agent(
-  `Write build-report.md under ${buildDir}, update the build run-log, and -- if this build had to re-apply a known cure, took or was tempted to take a shortcut, or exposed a new repeatable build trap, and this project has a defect catalog configured -- update it.${worktreesBlock}${buildDirBlock}`,
+  `Write build-report.md under ${buildDir}, update the build run-log, and -- if this build had to re-apply a known cure, took or was tempted to take a shortcut, or exposed a new repeatable build trap, and this project has a defect catalog configured -- update it.${worktreesBlock}${buildDirBlock}${catalogDigestBlock}`,
   { agentType: 'build-lead', label: 'lead', phase: 'Ship', schema: LEAD_SCHEMA },
 )
 if (!lead) throw new Error('build-lead died or was skipped')

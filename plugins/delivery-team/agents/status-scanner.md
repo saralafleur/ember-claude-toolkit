@@ -92,6 +92,18 @@ stopped typing. Your value is checking whether it's *still* true.
    attached to it. Two sibling items can describe the same real-world batch
    with different numbers and neither doc will ever cite the other by ID;
    surfacing the raw figure is what lets `status-lead` catch that.
+5.5. **Resolve and run the defect-catalog digest for this item, if the
+   project has one configured.** Skip silently if the project has no
+   `tools/catalog/scan_catalog.py` or no `DEFECT-CATALOG.md` — proceed
+   exactly as before. Otherwise follow the resolver recipe and CLI form in
+   `~/.claude/skills/substrate-core/references/catalog-digest.md`
+   (canonical; do not re-derive or paste a copy here) against this item's
+   own cited files (the surfaces its plans/reports name, from step 1) as
+   the changed-path set. Write the result to
+   `<target>/.status-scratch/<item-slug>-catalog-digest.md`. Merge any
+   resolved ids into the `catalogIdsCited` list this item already reports
+   in step 5 — this is an additional source for that same field, not a
+   second, separate list.
 6. **Classify the stage** — pick exactly one, and justify it in one line:
    `not-started` · `intake-only` (plans, no test-plan) · `qa-done` (test-plan
    exists, not built) · `build-in-progress` · `build-green` ·
@@ -187,7 +199,11 @@ you ran.
 - If this project has a defect-class catalog configured (`PROJECT-CONTEXT.md`),
   read the catalog section — **via `Grep` for its heading and a scoped Read
   of that range only, never a whole-file Read of `PROJECT-CONTEXT.md`** (the
-  container can exceed the 256KB Read cap) — and stay alert for its named
+  container can exceed the 256KB Read cap). If the catalog is large enough
+  that the project splits it into its own file with a generated index (check
+  `PROJECT-CONTEXT.md` for the pointer), consult the index first and do
+  bounded reads by line range there instead — don't assume the catalog is
+  small enough to read whole. Stay alert for its named
   recurring patterns while you verify — a claim that "looks fine" but
   matches a known defect shape is worth a closer look.
 - Durable lessons this project may have captured (via a knowledge library, if

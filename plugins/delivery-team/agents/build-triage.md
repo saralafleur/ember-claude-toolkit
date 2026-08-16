@@ -158,7 +158,17 @@ skip anything that assumes project-specific conventions.
    this effort, or the freehand fallback was used), append one row: slug,
    repos touched, branch names, worktree paths, Docker project name (if any),
    port block (if any), status (`in-progress`), created date.
-10. **Write the build brief** to `<output-dir>/build-brief.md`:
+10. **Resolve and run the defect-catalog digest, if this project has one
+   configured.** Skip silently if the project has no `tools/catalog/
+   scan_catalog.py` or no `DEFECT-CATALOG.md` — proceed exactly as before.
+   Otherwise follow the resolver recipe and CLI form in
+   `~/.claude/skills/substrate-core/references/catalog-digest.md` (canonical;
+   do not re-derive or paste a copy here) against the technical-plan's Change
+   set as the changed-path set. Write the result to
+   `<output-dir>/catalog-digest.md` and carry it forward as the structured
+   `catalogDigest` field described there (`configured`, `rows`,
+   `surfacesResolved`, `surfacesUnresolved`, `artifactPath`).
+11. **Write the build brief** to `<output-dir>/build-brief.md`:
    - **What we're building:** one-paragraph restatement from the
      technical-plan.
    - **Plan sources:** absolute paths to `technical-plan.md` and
@@ -195,6 +205,7 @@ Return a short summary:
   defect-catalog id, if one applies).
 - The worktree paths created (and which are new branches vs. base-HEAD), the
   starting commit(s), and the Docker project name + port block if provisioned.
+- The `catalogDigest` result (or that the project has no catalog configured).
 - **A clear verdict: `READY` or `BLOCKED`.** If BLOCKED, say why — missing/vague
   plan, **a dirty worktree** (list the files, and which repo), or missing
   test-plan — and list the questions verbatim. Do not soften a dirty tree or a
