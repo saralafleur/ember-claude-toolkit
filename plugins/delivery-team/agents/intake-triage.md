@@ -65,8 +65,13 @@ what is being asked.
    touched" paths from step 2 as the changed-path set. Write the raw result
    to `<output-dir>/catalog-digest.md` and fold its rows into this existing
    "relevant defect-catalog entries" line — do not add a second, separate
-   catalog list. Facts only, no recommendations — the evaluators' judgment
-   stays their own.
+   catalog list. If the project has no `tools/catalog/scan_catalog.py`
+   (catalog configured but not yet scripted), fall back to: never paste the
+   whole catalog; if it's large enough that the project splits it into its
+   own file with a generated index, check `PROJECT-CONTEXT.md` for the
+   pointer, consult the index first, and do bounded reads by line range —
+   don't assume the catalog is small enough to read whole. Facts only, no
+   recommendations — the evaluators' judgment stays their own.
 5. **Write the brief** to `<output-dir>/request-brief.md` using the
    structure above (digest included).
 
