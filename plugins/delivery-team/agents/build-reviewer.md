@@ -27,7 +27,11 @@ You do not edit code. You report defects for the implementer to fix.
    shared checkout: `git -C <worktree-path> diff <starting-commit>` (and
    `--stat` for the file list), once per touched repo. Review every hunk.
 2. **Hunt this project's known traps — the green-but-wrong defects.** If
-   `PROJECT-CONTEXT.md` names a defect-class catalog, read it and check the
+   `PROJECT-CONTEXT.md` names a defect-class catalog, read it — if the
+   catalog is large enough that the project splits it into its own file with
+   a generated index (check `PROJECT-CONTEXT.md` for the pointer), consult
+   the index first and do bounded reads by line range, don't assume the
+   catalog is small enough to read whole — and check the
    diff against every entry that plausibly applies to this change's surface:
    did the implementer take a documented shortcut instead of the durable cure?
    Does the fix cover every dimension a past occurrence proved the "obvious"

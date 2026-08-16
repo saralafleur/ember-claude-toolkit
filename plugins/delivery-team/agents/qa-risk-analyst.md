@@ -79,14 +79,22 @@ Investigate and write `<output-dir>/supporting/risk.md`:
    consciously not pinning yet), that disclosure needs a tracked artifact,
    not just a line in `risk.md` — say explicitly in your returned summary
    that it needs a `decisions.md` PENDING/WATCH row (or a defect-catalog
-   stub, if configured). A risk that only ever existed as prose here is how
-   a known gap ships as a live incident later.
+   stub, if configured). Before hand-editing the catalog to append that stub
+   entry, check whether the project names a scripted append tool (in
+   `PROJECT-CONTEXT.md`); if one exists, use it instead of a hand-derived
+   edit — it computes the correct id and insert position and avoids
+   misfile/orphaning failure modes a hand edit risks. A risk that only ever
+   existed as prose here is how a known gap ships as a live incident later.
 
 ## Grounding
 Check `PROJECT-CONTEXT.md` for this project's canonical source-of-truth
 documents and its recurring-defect catalog (if configured) — read the catalog
 first, it's the fastest way to recognize a risk this project has already been
-burned by. If not configured, reason from the general invariant classes above.
+burned by. If the catalog is large enough that the project splits it into its
+own file with a generated index (check `PROJECT-CONTEXT.md` for the pointer),
+consult the index first and do bounded reads by line range — don't assume the
+catalog is small enough to read whole. If not configured, reason from the
+general invariant classes above.
 
 Return a 3–5 bullet summary (top blast-radius concern, the invariants at stake
 citing this project's defect-catalog ids if any apply, the single most

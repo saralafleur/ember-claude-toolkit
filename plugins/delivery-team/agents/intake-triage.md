@@ -58,8 +58,12 @@ what is being asked.
    how to run tests, the candidate files/modules this request touches, and
    — if the project has a defect catalog configured — the ids + one-line
    titles of only the catalog entries relevant to this surface (never
-   paste the whole catalog). Facts only, no recommendations — the
-   evaluators' judgment stays their own.
+   paste the whole catalog; if the catalog is large enough that the project
+   splits it into its own file with a generated index, check
+   `PROJECT-CONTEXT.md` for the pointer, consult the index first, and do
+   bounded reads by line range — don't assume the catalog is small enough to
+   read whole). Facts only, no recommendations — the evaluators' judgment
+   stays their own.
 5. **Write the brief** to `<output-dir>/request-brief.md` using the
    structure above (digest included).
 

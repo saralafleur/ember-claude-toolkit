@@ -114,37 +114,62 @@ This convention **must be copied into every generated** project
 into procedure docs wherever a decision sits (see lifecycle / reference
 templates).
 
-## The optional lifecycle command set (build / up / down / remove)
+## The optional lifecycle command set (build / up / down / remove / restart)
 
-Projects with multiple runnable units often want four standard actions per
-unit rather than one bespoke command per service. This is backend-agnostic:
+Projects with multiple runnable units often want standard actions per unit
+rather than one bespoke command per service. This is backend-agnostic:
 the unit can be a **Docker Compose service** (image + container) just as
 easily as a **native background process** (a built binary/venv + a running
 PID, managed by something like `scripts/dev.sh start|stop|status` with
-PID-file bookkeeping instead of a container runtime) — same four verbs,
-same audit/plan/execute/verify shape, different underlying commands. Offer
-this set whenever the project has runnable units managed via Docker
-Compose or a native lifecycle script — including a **single-service**
-Compose stack (still give it `up` / `down` / `remove`; `build` optional
-if `up --build` covers it). Especially offer the full set when there are
-2+ independently named solutions (e.g. a `docker-compose.yml` with 2+
-services, or 2+ native processes started/stopped via PID files):
+PID-file bookkeeping instead of a container runtime) — same verbs, same
+audit/plan/execute/verify shape, different underlying commands. Offer this
+set whenever the project has runnable units managed via Docker Compose or
+a native lifecycle script — including a **single-service** Compose stack
+(still give it `up` / `down` / `remove`; `build` optional if `up --build`
+covers it). Especially offer the full set when there are 2+ independently
+named solutions (e.g. a `docker-compose.yml` with 2+ services, or 2+
+native processes started/stopped via PID files).
+
+**Execution model:** only the *judgment* parts of these verbs stay
+agent-mediated — everything mechanical (which command to run, retry/health
+polling, re-checking state afterward) runs through one generated script,
+`scripts/<name>-check.sh` (e.g. `compose-check.sh` / `native-check.sh`),
+invoked bare for the read-only audit and with an action argument
+(`<script> build|up|down|remove|restart <solution>`) to also execute that
+action. What stays agent-side: showing the plan and getting the user's yes
+before `remove --apply`, and reading/explaining a log dump when `up` or
+`restart` fails to become healthy (the script surfaces that dump; it
+never guesses at the diagnosis itself). Everything else is transcription
+of the same commands a human would type — see
+`templates/lifecycle-check.template.sh`'s dispatch section.
 
 - **`build <solution|all>`** — produce the build artifact (image, or a
   compiled binary / venv), start nothing.
 - **`up <solution|all>`** — build if needed, start, then prove it's actually
   serving (curl/log/PID check), not just that a container or process
-  technically exists.
+  technically exists. The script polls until healthy or a timeout; on
+  timeout it dumps the relevant log tail for the agent to read and explain.
 - **`down <solution|all>`** — stop the running unit (container, or kill the
   PID), keep the build artifact. Cheaply reversible — `up` again should be
   fast.
+- **`restart <solution|all>`** — `down` immediately followed by `up`
+  (same health-wait/timeout and failure-diagnosis carve-out as `up`). Zero
+  judgment beyond what those two already have — offer it whenever
+  `up`/`down` exist, including when it's not something the project's own
+  dev script already had; don't reinvent it per-project as a bespoke
+  reference doc (see "Update an existing devops skill" for retrofitting a
+  project that's missing it).
 - **`remove <solution|all>`** — wipe the solution's **local build
   artifacts** so nothing from that solution remains on the machine from a
-  prior `build`/`up`. **Destructive.** Always show what will be deleted
-  and its re-acquire cost (fast local rebuild vs. a real re-download) and
-  get explicit confirmation via a human gate
-  (`🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧`) before running — same rule as any
-  hard-to-reverse action.
+  prior `build`/`up`. **Destructive.** The script's `remove <solution>
+  --plan` mode computes what will be deleted and its re-acquire cost
+  (read-only, sourced from the audit's own state — the agent relays this,
+  it doesn't retype it from memory); show that plan and get explicit
+  confirmation via a human gate (`🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧`)
+  before running `remove <solution> --apply` — same rule as any
+  hard-to-reverse action. The human-gate wait itself is inherently
+  agent-mediated (a script can't perform a mid-conversation sync point) —
+  that's the one piece of `remove` that can't be scripted away.
   - **Docker Compose backend (intent):** remove every local Docker item
     this solution created — running/stopped containers, the compose
     project network(s), and images built for the solution (typically
@@ -163,10 +188,11 @@ services, or 2+ native processes started/stopped via PID files):
     delete that data, and wait for a yes/no before touching it — never
     delete it silently, and never assume removing the build artifact
     reset it (that data survives a plain `remove` and comes back
-    untouched on the next `up`/`build`). Offer a `--purge-data`-style
-    flag to skip the ask and go straight to "yes" for scripting/directness,
-    but the flag is an opt-in shortcut to the same confirmed action, not a
-    way to avoid the plan/confirm step.
+    untouched on the next `up`/`build`). The `--purge-data` flag (passed
+    through to the script's `--apply` call) skips the ask and goes
+    straight to "yes" for scripting/directness, but it's an opt-in
+    shortcut to the same confirmed action, not a way to avoid the
+    plan/confirm step.
 
 A **"solution"** is whatever unit the project defines as independently
 buildable/runnable — one row per Compose service, or one row per
@@ -175,23 +201,25 @@ operated together (e.g. a tunnel pair bound by `depends_on`, or a bridge
 process + app process always started/stopped as a pair) can be grouped
 into one named solution.
 
-These four commands share state, so they share ONE audit script
+These verbs share state, so they share ONE script
 (`scripts/<name>-check.sh`, e.g. `compose-check.sh` for a Docker backend or
-`native-check.sh` for a PID-file backend) rather than one each — it reports
-build+running status per solution and is Phase 1 for all four. `status`'s
+`native-check.sh` for a PID-file backend) rather than one each — bare
+invocation reports build+running status per solution (Phase 1 for every
+verb); with an action argument it also executes and re-audits. `status`'s
 discovery still globs `scripts/*-check.sh`; when several routing-table
-commands point at the same script, group them under one section in the
-status report instead of repeating the same table four times.
+commands point at the same script, they collapse into one section in the
+status report automatically, since discovery is per-script.
 
 Scaffold from `templates/lifecycle.template.md` (one reference doc covering
-all four actions) and `templates/lifecycle-check.template.sh` (the shared
-audit — has commented pattern blocks for both a Docker Compose backend and
-a native PID-file backend; use whichever matches the project, or both if it
-has solutions of both kinds). Still follows audit → plan → execute →
-verify, just lighter than environment setup: audit = current build/run
-state, plan = what will happen, execute = the actual compose command or
-`dev.sh`-style invocation, verify = re-audit plus a real traffic/log check
-for `up`.
+every verb) and `templates/lifecycle-check.template.sh` (the shared
+audit+action script — has commented pattern blocks for both a Docker
+Compose backend and a native PID-file backend; use whichever matches the
+project, or both if it has solutions of both kinds). Still follows audit →
+plan → execute → verify: audit = current build/run state (the script's
+bare invocation), plan = what will happen (stated by the agent; `remove`'s
+plan table comes straight from the script's `--plan` mode), execute = the
+script's action invocation, verify = the script's own re-audit plus,
+for `up`/`restart`, its built-in health-check proof.
 
 Every project-scoped check script resolves `PROJECT_ROOT` with a
 worktree-aware block (baked into `templates/lifecycle-check.template.sh` —
@@ -204,28 +232,39 @@ worktree). That silently runs every command against the wrong checkout.
 The fix: fall back to the naive resolution, but prefer `$PWD`'s own
 worktree when `git -C "$PWD" rev-parse --git-common-dir` matches the skill
 checkout's — same repo, different worktree — so commands and state stay
-scoped to the worktree actually being worked in.
+scoped to the worktree actually being worked in. Because the audit and the
+action functions now live in the same script, they always share this one
+resolution — there's no longer a separate prose `cd <project-root>` step
+that could resolve differently from the audit's own `PROJECT_ROOT`.
 
 If the project already has its own lifecycle script (a `scripts/dev.sh` or
 equivalent that starts/stops native processes), don't duplicate its logic —
-the `/devops` commands should thinly wrap it (call `scripts/dev.sh build`,
-`up`, `down`, etc.) and add only what it's missing, most often `remove`
-(deleting build artifacts is rarely a verb an app's own dev script needs,
-so this is usually genuinely new, implemented directly in the reference doc
-as `rm -rf`/`rm -f` steps against the same paths `build` created).
+the generated script's action functions should thinly wrap it (call
+`scripts/dev.sh build`, `up`, `down`, etc. from inside `do_build`/`do_up`/
+`do_down`) and add only what it's missing, most often `remove` (deleting
+build artifacts is rarely a verb an app's own dev script needs, so this is
+usually genuinely new). If the existing dev script *does* expose verbs
+beyond build/up/down/remove (its own `restart`, `logs`, anything else),
+wrap those too rather than leaving them unreachable through `/devops` —
+ask about this explicitly at interview time (see Procedure below).
 
 ## The standard `status` command
 
 Every generated devops skill includes a `status` command, created at scaffold
 time alongside the first real command. It is what makes the toolbox
-observable, and it is generic by construction:
+observable, and it runs almost entirely as a script — the discover → run →
+classify → format sequence is fully mechanical (each check script's own
+`DETAIL` column already carries the fix hint), so there's no reasoning left
+to spend on it per invocation:
 
 - **Discovers** every audit script in the skill's `scripts/` directory
   (`scripts/*-check.sh` → one entry per command), so commands added later are
   reported automatically with zero changes to `status`.
 - **Runs** each audit (all read-only, all exit 0) and reports per command: a
   verdict — **ready** (all build-relevant rows `ok`), **partial**, or **not
-  set up** — the non-`ok` rows, and the exact `/devops <command>` to fix it.
+  set up** — the non-`ok` rows, and the exact `/devops <command>` to fix it
+  (already embedded in each row's `DETAIL`, so this is string passthrough,
+  not something the agent computes).
 - **Reports git worktree & branch status** — always, not just "when
   relevant": one row per `git worktree list` entry (path, current branch,
   sync state vs `origin`, working-tree cleanliness, and whether the branch
@@ -236,13 +275,17 @@ observable, and it is generic by construction:
   has its single main checkout — that's real state worth seeing, not
   something to skip. Skip this section silently if the project isn't a git
   repo at all.
-- **Adds live extras** where cheap and read-only (running services, booted
-  simulators/containers, in-flight background downloads).
 - **Never installs, fixes, or changes anything.**
 - Bare `/devops` routes to `status`, and `status` appears in the
   `argument-hint`.
 
-Scaffold it from `templates/status.template.md`.
+Scaffold the report script from `templates/status-report.template.sh` (does
+discover/run/classify/format, including the git-worktree section, as real
+bash — not prose the agent re-derives) into `scripts/status-report.sh`, and
+the (now thin) procedure doc from `templates/status.template.md`, which
+just says: run the script, relay its output verbatim, and only add
+explanation if a row's `DETAIL` doesn't answer a follow-up question the user
+asks.
 
 ## Update an existing devops skill
 
@@ -257,8 +300,10 @@ surgical patches.
 1. Resolve the project root (cwd / git root). If
    `<project>/.claude/skills/devops/SKILL.md` is missing, report that there
    is nothing to update and offer to run scaffold mode instead. Stop.
-2. Read this meta-skill's live templates under `templates/` and the
-   checklist at `references/standard-checklist.md`.
+2. Read this meta-skill's live templates under `templates/`, the checklist
+   at `references/standard-checklist.md`, and `references/known-gaps.md` —
+   a known gap open against this meta-skill itself (not the target project)
+   is context for the audit, not a row to check the project against.
 3. Walk the checklist against the project's devops skill. For every row,
    record a verdict: **ok**, **drift**, **missing**, or **n/a**.
 4. Also spot-check that shared prose still matches the *intent* of the
@@ -353,15 +398,20 @@ Topics to resolve (gate each one that isn't already obvious from the repo):
 - What does "verified working" mean for this project? (the smoke test)
 - Does the project have runnable units — Docker Compose service(s) and/or
   native background processes managed by a dev script (PID files, `nohup`,
-  etc.)? If so, offer the `build`/`up`/`down`/`remove` lifecycle set (see
-  above), including for a single-service Compose stack. Name the actual
-  solutions and confirm the grouping (e.g. does a bridge process + app
-  process always started together count as one solution or two) before
+  etc.)? If so, offer the `build`/`up`/`down`/`remove`/`restart` lifecycle
+  set (see above), including for a single-service Compose stack. Name the
+  actual solutions and confirm the grouping (e.g. does a bridge process +
+  app process always started together count as one solution or two) before
   scaffolding. For Docker backends, confirm that `remove` means wiping
   local compose artifacts for that solution (containers, project
   networks, locally-built images) and does not touch remote registries.
   If a native dev script already exists, plan to wrap it rather than
   reimplement its start/stop logic.
+- If a native dev script already exists: does it expose verbs beyond
+  build/up/down/remove (its own `restart`, `logs`, a custom `seed`, etc.)?
+  If so, offer to wrap those too rather than leaving real, already-working
+  capability unreachable through `/devops` — name them in the generated
+  `lifecycle.md`'s Notes section either way (wrapped or deliberately not).
 - If offering the lifecycle set: does any solution persist real data outside
   its build artifact — a Docker bind-mounted data volume (check the compose
   file's `volumes:` for a host-path source, `./something:/container/path`,
@@ -380,8 +430,9 @@ Copy and fill the templates in this skill's `templates/` directory:
 | `reference.template.md` | `.claude/skills/devops/references/<command>.md` | audit keys, plan table, install steps, smoke test |
 | `check.template.sh` | `.claude/skills/devops/scripts/<command>-check.sh` | one check block per prerequisite |
 | `status.template.md` | `.claude/skills/devops/references/status.md` | usually verbatim — it is fully generic |
-| `lifecycle.template.md` | `.claude/skills/devops/references/lifecycle.md` (one file covering all four `build`/`up`/`down`/`remove` actions) | naming the project's actual solutions/services and backend (Docker Compose, native PID-file processes, or mixed) |
-| `lifecycle-check.template.sh` | `.claude/skills/devops/scripts/<name>-check.sh` (e.g. `compose-check.sh` or `native-check.sh`) | one built+running check block per solution, using whichever commented pattern (Docker or native) matches — only when the project has 2+ runnable units |
+| `status-report.template.sh` | `.claude/skills/devops/scripts/status-report.sh` | usually verbatim beyond the `{{PROJECT}}` label — it is fully generic |
+| `lifecycle.template.md` | `.claude/skills/devops/references/lifecycle.md` (one file covering every lifecycle verb present — `build`/`up`/`down`/`remove`/`restart`; or one `references/<verb>.md` per verb, see F1) | naming the project's actual solutions/services and backend (Docker Compose, native PID-file processes, or mixed) |
+| `lifecycle-check.template.sh` | `.claude/skills/devops/scripts/<name>-check.sh` (e.g. `compose-check.sh` or `native-check.sh`) | one built+running check block per solution (§1) plus one action-function set per solution (§2), using whichever commented pattern (Docker or native) matches — only when the project has 2+ runnable units |
 
 Rules that must survive templating:
 

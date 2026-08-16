@@ -15,8 +15,6 @@ bash <skill-base-dir>/scripts/{{command}}-check.sh
 If every build-relevant row is `ok`, report "environment is already set up",
 offer the Phase 4 smoke test as proof, and stop.
 
-If invoked in status-only mode (bare `/devops`), stop after showing the table.
-
 ## Phase 2 — Plan
 
 From the audit, list only the missing/wrong items, in dependency order, with

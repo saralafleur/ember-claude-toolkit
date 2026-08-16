@@ -5,75 +5,40 @@ skill manages in right now?" Never installs, fixes, or changes anything.
 
 ## Procedure
 
-1. **Discover** — enumerate every audit script in this skill's `scripts/`
-   directory (`scripts/*-check.sh`). Each one usually belongs to a single
-   command (`<command>-check.sh` → `<command>`), picked up automatically
-   with no changes to this doc needed. Exception: the lifecycle set
-   (`build`/`up`/`down`/`remove`) shares ONE script (e.g.
-   `compose-check.sh`) — report those four commands together under one
-   section keyed by solution, not as four repeated tables.
+Run the report script and relay its output verbatim — it already discovers
+every `scripts/*-check.sh`, runs each, classifies a verdict, groups the
+lifecycle set (`build`/`up`/`down`/`remove`/`restart`, which share one
+check script) into one section automatically, and appends the git worktree
+& branch status:
 
-2. **Run** — execute each audit script (they are all read-only and exit 0):
+```bash
+bash <skill-base-dir>/scripts/status-report.sh
+```
 
-   ```bash
-   bash <skill-base-dir>/scripts/<command>-check.sh
-   ```
-
-3. **Report** — for each command show:
-   - A one-line verdict: **ready** (all build-relevant rows `ok`),
-     **partial** (some `ok`, some not), or **not set up** (core rows
-     MISSING/WRONG).
-   - The full audit table (or, if long, only the non-`ok` rows plus a count
-     of healthy ones).
-   - If unhealthy: the exact command to fix it (e.g. `/devops <command>`).
-
-4. **Git worktree & branch status** — if the project is a git repo, report
-   one row per `git worktree list` entry: path, current branch, sync state
-   vs `origin` (ahead N / behind N / in sync), working-tree cleanliness
-   (clean / N modified, M untracked), and whether the branch is merged into
-   the project's default branch. This is the same table shape the
-   `wrap-up` skill uses for its own orientation table — keep them
-   consistent. Skip this section silently if the project isn't a git repo.
-
-   ```bash
-   # Default branch (fall back to checking main/master/trunk if this fails)
-   default_branch="$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#origin/##')"
-
-   git worktree list --porcelain | awk '/^worktree /{print $2}' | while read -r wt; do
-     branch="$(git -C "$wt" symbolic-ref --short -q HEAD || git -C "$wt" rev-parse --short HEAD)"
-     upstream="$(git -C "$wt" rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null)"
-     if [ -n "$upstream" ]; then
-       counts="$(git -C "$wt" rev-list --left-right --count "$upstream...HEAD" 2>/dev/null)"
-     fi
-     dirty_count="$(git -C "$wt" status --porcelain | wc -l | tr -d ' ')"
-     merged="$(git -C "$wt" branch --merged "$default_branch" 2>/dev/null | grep -qx "  $branch\|\* $branch" && echo yes || echo no)"
-     echo "$wt | $branch | $counts | $dirty_count | $merged"
-   done
-   ```
-
-   Treat the row for the default branch itself as `n/a — already default`
-   in the last column rather than running the merge check against itself.
-
-5. **Extras worth including when relevant** (cheap, read-only): running
-   services, booted simulators/containers, background installs or downloads
-   still in flight from this session.
+The only judgment left on top of this script's output: if a row's `Fix`
+column or `DETAIL` string doesn't answer a follow-up question the user asks
+(e.g. "why is that happening"), explain further using the full audit table
+in that section. Don't re-derive the table or the verdicts by hand — the
+script already computed them.
 
 ## Report format
 
+The script's own output already matches this shape — relay it as-is:
+
 ```
-## /devops status
+## /devops status — <project>
 
 | Command | Verdict | Fix |
 |---|---|---|
 | <command> | ✅ ready | — |
 
-<details per command: audit table or non-ok rows>
+### <command>
+
+<full audit table for that command>
 
 ### Git worktree & branch status
 
 | Location | Branch | vs `origin` | Working tree | Merged into default? |
 |---|---|---|---|---|
-| `<path>` | `<branch>` | ahead N / behind N / in sync | clean / N modified, M untracked | yes (`<sha>`) / no / n/a — already default |
+| `<path>` | `<branch>` | behind N / ahead N | clean / N changed | yes / no / n/a — already default |
 ```
-
-Keep it scannable — verdicts first, detail after.

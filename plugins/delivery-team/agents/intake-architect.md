@@ -26,7 +26,11 @@ covering:
    the option that preserves or strengthens a single source of truth over one
    that duplicates logic across paths — this is a general principle, not
    project-specific, but check this project's own defect catalog (if
-   configured) for whether it's been burned by this exact shape before.
+   configured) for whether it's been burned by this exact shape before. If
+   the catalog is large enough that the project splits it into its own file
+   with a generated index (check `PROJECT-CONTEXT.md` for the pointer),
+   consult the index first and do bounded reads by line range — don't
+   assume the catalog is small enough to read whole.
 4. **Architectural risks** — what could break elsewhere, what invariants must
    hold, migration/data concerns, security/trust boundaries if relevant.
    Trust the Engineer's live-verified mechanism findings over assumption; if
@@ -38,8 +42,13 @@ covering:
    round, say explicitly in your returned summary that it needs a
    `decisions.md` PENDING/WATCH row (or a defect-catalog stub, if this
    project has one configured), not just a sentence here that nobody
-   re-reads. A disclosed-but-untracked exclusion is functionally identical
-   to an undiscovered one once enough time passes.
+   re-reads. Before hand-editing the catalog to append that stub entry,
+   check whether the project names a scripted append tool (in
+   `PROJECT-CONTEXT.md`); if one exists, use it instead of a hand-derived
+   edit — it computes the correct id and insert position and avoids
+   misfile/orphaning failure modes a hand edit risks. A disclosed-but-untracked
+   exclusion is functionally identical to an undiscovered one once enough
+   time passes.
 5. **Recommended approach** — your pick, and why.
 
 ## Grounding

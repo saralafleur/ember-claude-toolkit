@@ -49,6 +49,7 @@ gates) over older generated prose — but keep project-filled `{{…}}` values.
 | C5 | Never installs/fixes/changes anything | status.md |
 | C6 | Report format: verdicts table first (`ready` / `partial` / `not set up`), detail after | Align with `templates/status.template.md` |
 | C7 | Reports git worktree & branch status — one row per `git worktree list` entry (path, branch, sync vs `origin`, working-tree cleanliness, merged-into-default), always shown (not just "when relevant"), skipped only if the project isn't a git repo | status.md procedure + `templates/status.template.md` |
+| C8 | `status` runs via a real script (`scripts/status-report.sh`) that does discover/run/classify/format and the git-worktree section — `status.md` is a thin wrapper telling the agent to run it and relay the output, not a procedure the agent re-derives from prose each invocation | `scripts/status-report.sh` exists + `references/status.md` matches `templates/status.template.md` |
 
 ## D. Per-command structure
 
@@ -72,7 +73,7 @@ gates) over older generated prose — but keep project-filled `{{…}}` values.
 
 | # | Invariant | How to check |
 |---|---|---|
-| F1 | Shared reference `references/lifecycle.md` covers the verbs that exist | Path + headings |
+| F1 | Lifecycle verbs are documented in one of the two valid shapes: a single shared `references/lifecycle.md` covering every verb that exists, **or** one `references/<verb>.md` per verb (e.g. `build.md`/`up.md`/`down.md`/`remove.md`/`restart.md`). Both are equally valid — do not flag a working per-verb layout as **missing** just because `lifecycle.md` doesn't exist. A third, per-solution-named variant (e.g. `desktop-build.md`/`docker-lifecycle.md`) is legacy/non-standard — flag it as **drift** (propose consolidating to one of the two valid shapes), not **missing** | Path + headings, either shape |
 | F2 | Shared audit script (e.g. `compose-check.sh` / `native-check.sh`) is Phase 1 for all lifecycle verbs | lifecycle.md + scripts |
 | F3 | Solutions table names real units; `all` defined | lifecycle.md |
 | F4 | `up` verifies with a real traffic/log/health check, not just "container/PID exists" | lifecycle.md § up |
@@ -82,6 +83,10 @@ gates) over older generated prose — but keep project-filled `{{…}}` values.
 | F8 | Docker backend: image presence uses `docker compose config --images` + `docker image inspect`, **not** `docker compose images` | Audit script |
 | F9 | Docker `remove` scopes to the compose project only — no other projects, no remote registries | lifecycle.md |
 | F10 | Native backend: wrap existing `scripts/dev.sh` (or equiv.) rather than duplicating start/stop; `remove` may be the only new verb | lifecycle.md |
+| F11 | `restart` exists (offered whenever `up`/`down` do) and is implemented as the shared script's `restart` action (down+up composition) — not a bespoke hand-rolled reference doc reinventing the same logic | lifecycle.md § restart + script dispatch |
+| F12 | Mutating actions (build/up/down/remove/restart) execute via the shared script's action dispatch (`<script> <action> <solution>`) — the agent runs the script, it does not hand-type the underlying compose/native commands from prose each invocation | `scripts/<name>-check.sh` has action functions (§2) + dispatch (§3) matching the template's structure |
+| F13 | `remove`'s plan table is produced by the script's `--plan` mode (read-only, sourced from audit state) and execute uses `--apply [--purge-data]` — the agent relays the plan, it does not retype it from memory of prose | lifecycle.md § remove |
+| F14 | `up`/`restart`: on failure to become healthy, the script dumps a log tail (stderr) and exits non-zero; the reference doc instructs the agent to read and explain that dump, not guess at diagnosis | lifecycle.md § up, § restart |
 
 ## G. Template drift (shared prose)
 
@@ -93,7 +98,8 @@ propose a surgical patch (do not wholesale replace project-specific fill-ins):
 |---|---|
 | `templates/SKILL.template.md` → Human gates + discipline + status + adding-commands | `SKILL.md` |
 | `templates/status.template.md` | `references/status.md` |
-| `templates/lifecycle.template.md` (if lifecycle present) | `references/lifecycle.md` |
+| `templates/status-report.template.sh` | `scripts/status-report.sh` |
+| `templates/lifecycle.template.md` (if lifecycle present) | `references/lifecycle.md` (or per-verb `references/<verb>.md` files — see F1) |
 | `templates/check.template.sh` / `lifecycle-check.template.sh` | matching `scripts/*-check.sh` |
 
 ---
