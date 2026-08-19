@@ -1,5 +1,5 @@
 {
-  "name": "viability-division",
+  "name": "ember-foundation-substrate-toolkit",
   "description": "Three chained virtual teams that take a product idea from question to plan: team-research (sourced market/competitor/monetization dossier), team-viability (BUILD / DON'T BUILD / NEEDS MORE EVIDENCE verdict, grounded in the real artifact plus the dossier), and team-business-plan (offering, financials, and go-to-market built on the verdict).",
   "version": "1.0.0",
   "author": {

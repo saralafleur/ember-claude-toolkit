@@ -12,7 +12,7 @@ Sara LaFleur's source-of-truth marketplace for her Claude Code skills and agents
 | [`story-map`](plugins/story-map) | Scaffolds a complete UAT story map for an application — discovers roles/workflows/routes and generates a role-first test folder tree plus ready-to-run Playwright MCP UAT execution and status-reset agent prompts. |
 | [`product-analyst`](plugins/product-analyst) | Runs a virtual product team over a web solution and produces one ranked top-10 list of what to build next — `product` for feature/end-user, `tech` for technical/hardening — via triage, three specialists in parallel, a double-blind validation pass, and a lead that reconciles it all. |
 | [`engineering-manager`](plugins/engineering-manager) | Gets a folder's outstanding work (typically `team-status`'s stage-map) moving on the right track — `triage` sorts items into housekeeping / needs-intake / needs-human, `dispatch` decides whether build-ready items build in parallel, sequentially, or as a single session, then dispatches and babysits the runs through to merge. Companion to `delivery-team`. |
-| [`viability-division`](plugins/viability-division) | Three chained virtual teams that take a product idea from question to plan: `team-research` (sourced market/competitor/monetization dossier), `team-viability` (BUILD / DON'T BUILD / NEEDS MORE EVIDENCE verdict grounded in the real artifact plus the dossier), and `team-business-plan` (offering, financials, and go-to-market built on the verdict). |
+| [`ember-foundation-substrate-toolkit`](plugins/ember-foundation-substrate-toolkit) | Three chained virtual teams that take a product idea from question to plan: `team-research` (sourced market/competitor/monetization dossier), `team-viability` (BUILD / DON'T BUILD / NEEDS MORE EVIDENCE verdict grounded in the real artifact plus the dossier), and `team-business-plan` (offering, financials, and go-to-market built on the verdict). |
 
 ## Install (Claude Code)
 
@@ -37,7 +37,7 @@ Or from a local clone:
 /plugin install story-map@ember-toolkit
 /plugin install product-analyst@ember-toolkit
 /plugin install engineering-manager@ember-toolkit
-/plugin install viability-division@ember-toolkit
+/plugin install ember-foundation-substrate-toolkit@ember-toolkit
 ```
 
 **3. Reload** — run `/reload-plugins` to activate immediately, or restart your Claude Code session.

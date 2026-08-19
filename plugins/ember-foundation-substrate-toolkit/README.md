@@ -1,4 +1,4 @@
-# viability-division
+# ember-foundation-substrate-toolkit
 
 ⚠️ **Experimental.** These skills are actively evolving — expect rough edges,
 and report issues if something breaks.
