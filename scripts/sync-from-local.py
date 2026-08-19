@@ -35,6 +35,9 @@ SKILL_MAP = {
     'engineering-manager': 'engineering-manager/skills/engineering-manager',
     'wrap-up':             'dev-workflow/skills/wrap-up',
     'create-skill-devops': 'dev-workflow/skills/create-skill-devops',
+    'team-research':       'viability-division/skills/team-research',
+    'team-viability':      'viability-division/skills/team-viability',
+    'team-business-plan':  'viability-division/skills/team-business-plan',
 }
 
 # Plugins whose packaged copies diverge from ~/.claude on purpose (heavier
@@ -57,6 +60,14 @@ AGENT_MAP = {
         'status-lead','status-scanner','status-triage',
     ],
     'engineering-manager': ['em-analyst','em-judge','em-lead'],
+    'viability-division': [
+        'research-triage','research-scout','research-comparator',
+        'research-validator','research-lead',
+        'viability-triage','viability-product','viability-market',
+        'viability-stakeholder','viability-judge','viability-lead',
+        'bizplan-triage','bizplan-offering','bizplan-financial',
+        'bizplan-gtm','bizplan-judge','bizplan-lead',
+    ],
 }
 
 SANITIZE = [
