@@ -40,7 +40,10 @@ Investigate the real test suites and write `<output-dir>/supporting/coverage.md`
    whether the surface's entries there each have a corresponding assertion. An
    entry with no test covering it is an UNGUARDED surface even if the suite is
    green — call it out explicitly, citing this project's defect-catalog id if
-   one applies.
+   one applies. If the catalog is large enough that the project splits it
+   into its own file with a generated index (check `PROJECT-CONTEXT.md` for
+   the pointer), consult the index first and do bounded reads by line
+   range — don't assume the catalog is small enough to read whole.
 4. **Current baseline (run it)** — decide which suites are relevant to the
    touched surfaces and whether a targeted or full run suffices (that
    judgment call is yours — don't run the whole world if a targeted run

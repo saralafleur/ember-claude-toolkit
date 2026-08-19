@@ -32,7 +32,11 @@ implementer can execute without re-deriving the investigation:
 1. **Objective** — one paragraph: what coverage we're adding and the end state
    (which invariants will be guarded that aren't today).
 2. **Coverage gap being closed** — the UNGUARDED surfaces from the assessment, each
-   tied to this project's defect-catalog id where one applies, that this plan pins.
+   tied to this project's defect-catalog id where one applies, that this plan pins
+   (if the catalog is large enough that the project splits it into its own file with
+   a generated index, check `PROJECT-CONTEXT.md` for the pointer, consult the index
+   first, and do bounded reads by line range — don't assume the catalog is small
+   enough to read whole).
 3. **Test change set** — ordered list of spec/test files to add or modify, grouped by
    this project's actual layers (discover them — don't assume a fixed set), each
    with its path and the exact assertion(s). Reconcile the unit and e2e architects:

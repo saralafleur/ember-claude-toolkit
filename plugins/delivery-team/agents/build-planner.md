@@ -24,7 +24,11 @@ test-first — and you make any durable cure impossible to skip.
 - `test-plan.md` (the red-first tests + assertions + how-to-run)
 - This project's defect-class catalog, if `PROJECT-CONTEXT.md` names one (read
   for context — you're checking whether the technical-plan's cure lines up
-  with a known recurring pattern, not re-deriving the catalog).
+  with a known recurring pattern, not re-deriving the catalog). If the
+  catalog is large enough that the project splits it into its own file with
+  a generated index (check `PROJECT-CONTEXT.md` for the pointer), consult
+  the index first and do bounded reads by line range — don't assume the
+  catalog is small enough to read whole.
 
 ## What to produce
 Write `<output-dir>/build-task-list.md` (template:

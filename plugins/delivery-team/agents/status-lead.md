@@ -317,7 +317,11 @@ it at Step 4.5. This is what the orchestrator relays to the user.
   `qa/test-plan.md`+`qa-assessment.md` = qa done; `build/**/build-report.md` =
   build done (verify its claims — see the scanners' findings).
 - If this project has a defect-class catalog configured (`PROJECT-CONTEXT.md`),
-  cite its id when an item's next step is closing one of its entries.
+  cite its id when an item's next step is closing one of its entries. If the
+  catalog is large enough that the project splits it into its own file with
+  a generated index (check `PROJECT-CONTEXT.md` for the pointer), consult
+  the index first and do bounded reads by line range — don't assume the
+  catalog is small enough to read whole.
 - Each `team-build` run works in its own isolated git worktree set (see
   `build-triage`'s role file), not a single shared checkout — the project's
   effort registry (if configured) is the record of which efforts currently

@@ -25,7 +25,11 @@ reads first.
 - `<output-dir>/supporting/risk.md` (invariants at risk + traps)
 - `<output-dir>/supporting/unit-tests.md` and `e2e-tests.md` (proposed tests)
 - **Shared recurring-issue memory (read FIRST, if this project has one):**
-  location per `PROJECT-CONTEXT.md`.
+  location per `PROJECT-CONTEXT.md`. If the catalog is large enough that the
+  project splits it into its own file with a generated index (check
+  `PROJECT-CONTEXT.md` for the pointer), consult the index first and do
+  bounded reads by line range — don't assume the catalog is small enough to
+  read whole.
 - **QA run-log:** location per `PROJECT-CONTEXT.md` if configured, else
   `~/.claude/skills/team-qa/memory/qa-run-log.md` (past QA runs). **Never
   `Read` this file in full — `grep` it for this project's name** (or this
@@ -135,9 +139,14 @@ Write `<output-dir>/qa-assessment.md` (template:
 - If this project has a defect-class catalog configured and this change
   exposed or matched a recurring test-gap, update the matching entry
   (increment occurrence, add a dated note) — or, if it's a genuinely new class
-  of green-suite-but-broken gap likely to repeat, add a new entry. Keep it
-  terse and high-signal. This is the shared source of truth — do not fork it.
-  If the project has no catalog configured, skip this — don't invent one.
+  of green-suite-but-broken gap likely to repeat, add a new entry. Before
+  hand-editing the catalog to append an entry, check whether the project
+  names a scripted append tool (in `PROJECT-CONTEXT.md`); if one exists, use
+  it instead of a hand-derived edit — it computes the correct id and insert
+  position and avoids misfile/orphaning failure modes a hand edit risks.
+  Keep it terse and high-signal. This is the shared source of truth — do not
+  fork it. If the project has no catalog configured, skip this — don't
+  invent one.
 
 ## Output (final text to orchestrator)
 Return: the coverage verdict (ADEQUATE/GAPPED/BLIND), "seen this gap class before?

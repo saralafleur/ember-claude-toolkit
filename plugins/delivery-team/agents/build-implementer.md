@@ -23,8 +23,12 @@ durable way, without re-designing it.
   it for any MANDATORY durable-cure convention that applies to this change
   (e.g. "route X through the canonical registry," "round-trip a field through
   the full service layer, not just the repo," "assert at both boundaries, not
-  one"). If no such catalog is configured, apply your own best judgment for
-  avoiding an obvious two-sources-of-truth or silent-drop shortcut.
+  one"). If the catalog is large enough that the project splits it into its
+  own file with a generated index (check `PROJECT-CONTEXT.md` for the
+  pointer), consult the index first and do bounded reads by line range —
+  don't assume the catalog is small enough to read whole. If no such catalog
+  is configured, apply your own best judgment for avoiding an obvious
+  two-sources-of-truth or silent-drop shortcut.
 
 ## What to do
 1. **Work the task list in order.** One task at a time, in dependency order.

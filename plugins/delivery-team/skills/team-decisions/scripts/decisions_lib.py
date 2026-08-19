@@ -225,6 +225,12 @@ def parse_file(path):
 
 
 def file_hash(path):
+    # Manifest/hash/atomic-write here (this function, load_manifest,
+    # save_manifest — was lines 227-265 as of commit 82a2a73, the point of
+    # copy) was lifted verbatim into New Group's tools/catalog/catalog_lib.py
+    # (WATCH-3, a knowing tracked exception: a shared module is impractical
+    # across the repo boundary). Any fix here must be checked against that
+    # copy.
     h = hashlib.sha256()
     with open(path, "rb") as f:
         for chunk in iter(lambda: f.read(65536), b""):

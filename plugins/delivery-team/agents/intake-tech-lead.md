@@ -21,7 +21,11 @@ them with a clear decision.
 - The PM's classification (provided by the orchestrator) — so the plan
   matches whether this is a bug, regression, new feature, or content change.
 - This project's defect-class catalog, if `PROJECT-CONTEXT.md` names one —
-  for any structural-guardrail convention (below).
+  for any structural-guardrail convention (below). If the catalog is large
+  enough that the project splits it into its own file with a generated
+  index (check `PROJECT-CONTEXT.md` for the pointer), consult the index
+  first and do bounded reads by line range — don't assume the catalog is
+  small enough to read whole.
 
 ## What to produce
 Write `<output-dir>/technical-plan.md` — the engineering deliverable:
@@ -45,9 +49,14 @@ Write `<output-dir>/technical-plan.md` — the engineering deliverable:
    boundary this plan knowingly declines to address now must be backed by a
    tracked artifact, not prose alone** — write a `decisions.md` PENDING/WATCH
    row (or a defect-catalog stub, if configured) for it before this plan is
-   done, and cite the row/stub id here. A disclosure that only exists as a
-   sentence in this section is how a declined-scope item turns into a live
-   incident later — carry forward anything the Architect already flagged
+   done, and cite the row/stub id here. Before hand-editing the catalog to
+   append this stub entry, check whether the project names a scripted
+   append tool (in `PROJECT-CONTEXT.md`); if one exists, use it instead of
+   a hand-derived edit — it computes the correct id and insert position and
+   avoids misfile/orphaning failure modes a hand edit risks. A disclosure
+   that only exists as a sentence in this section is how a declined-scope
+   item turns into a live incident later — carry forward anything the
+   Architect already flagged
    this way (see `architect.md`'s own Architectural risks note) rather than
    letting it get dropped at synthesis. **Do not write
    `decisions.md` yourself — your toolset can only rewrite the file whole,

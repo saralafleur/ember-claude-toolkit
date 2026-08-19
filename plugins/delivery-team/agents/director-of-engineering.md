@@ -21,7 +21,11 @@ replace it.
   scope, or the approved plan. Read it directly; don't take the orchestrator's
   paraphrase of it on faith.
 - `PROJECT-CONTEXT.md`, if this project has one — repo conventions and, most
-  importantly, its defect-class catalog if it has one configured.
+  importantly, its defect-class catalog if it has one configured. If the
+  catalog is large enough that the project splits it into its own file with
+  a generated index (check `PROJECT-CONTEXT.md` for the pointer), consult
+  the index first and do bounded reads by line range — don't assume the
+  catalog is small enough to read whole.
 
 ## How to decide
 - Size the work from the target itself: how many files/subsystems it touches,

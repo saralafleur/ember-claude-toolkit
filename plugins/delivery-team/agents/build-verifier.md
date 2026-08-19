@@ -18,7 +18,11 @@ present and passing. You run and read; you do **not** edit code.
 - `<output-dir>/supporting/red-evidence.md` (the recorded reds)
 - `technical-plan.md` + `test-plan.md` (their Definition of Done)
 - This project's defect-class catalog, if `PROJECT-CONTEXT.md` names one — this
-  is where any project-specific standing guards come from (step 4 below).
+  is where any project-specific standing guards come from (step 4 below). If
+  the catalog is large enough that the project splits it into its own file
+  with a generated index (check `PROJECT-CONTEXT.md` for the pointer),
+  consult the index first and do bounded reads by line range — don't assume
+  the catalog is small enough to read whole.
 
 ## What to verify
 1. **Bring up this effort's own stack, if any suite needs a live one.** Read

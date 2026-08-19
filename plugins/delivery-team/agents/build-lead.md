@@ -33,7 +33,11 @@ of claim worth a second, independent look at this stage.
 - `<output-dir>/decisions.md` (if any auto-decisions were logged — this file
   is written by the orchestrating session directly, not by any subagent;
   read it as-is)
-- This project's defect-class catalog, if `PROJECT-CONTEXT.md` names one.
+- This project's defect-class catalog, if `PROJECT-CONTEXT.md` names one. If
+  the catalog is large enough that the project splits it into its own file
+  with a generated index (check `PROJECT-CONTEXT.md` for the pointer),
+  consult the index first and do bounded reads by line range — don't assume
+  the catalog is small enough to read whole.
 - Build run-log location: check `PROJECT-CONTEXT.md`; if it names one, append
   there. Otherwise use the cross-project fallback at
   `~/.claude/skills/team-build/memory/build-run-log-INDEX.md` (less useful
@@ -80,9 +84,14 @@ user reads:
   shortcut**, or exposed a **new repeatable build trap**, and this project has
   a defect-class catalog configured, update the matching entry there
   (increment occurrence, add a dated note) — or add a new entry if it's a
-  genuinely new class. Keep it terse and high-signal. If this project has no
-  catalog configured, note the finding in the build report instead; don't
-  invent a new memory file for it unasked.
+  genuinely new class. Before hand-editing the catalog to append an entry,
+  check whether the project names a scripted append tool (in
+  `PROJECT-CONTEXT.md`); if one exists, use it instead of a hand-derived
+  edit — it computes the correct id and insert position and avoids
+  misfile/orphaning failure modes a hand edit risks. Keep it terse and
+  high-signal. If this project has no catalog configured, note the finding
+  in the build report instead; don't invent a new memory file for it
+  unasked.
 
 ## Output (final text to orchestrator)
 Return: the change verdict, durable-cure applied/deferred (with catalog id if

@@ -1,6 +1,6 @@
 ---
 name: team-release
-description: 'Run a small virtual release team (release-scribe, release-lead) over everything that shipped in a version and produce a client-facing release-notes.md — on any project. Use when: one or more team-build runs are done (verified green) and you want to tell the client what changed; you are cutting a version and need plain-language notes for a non-technical client; you want to bundle several work items into ONE client release doc; or you need release notes that are fact-checked against the actual shipped commits, not just what a report claimed. Produces a client-facing release-notes.md plus a private crosswalk mapping every note back to its item/commit/decision, and remembers each release in a release-log.'
+description: 'Run a small virtual release team (release-scribe, release-lead) over everything that shipped in a version and produce a client-facing release-notes.md plus a self-contained release-notes.pdf — on any project. Use when: one or more team-build runs are done (verified green) and you want to tell the client what changed; you are cutting a version and need plain-language notes for a non-technical client; you want to bundle several work items into ONE client release doc; or you need release notes that are fact-checked against the actual shipped commits, not just what a report claimed. Produces client-facing release-notes.md + release-notes.pdf (images embedded, self-contained), a private crosswalk mapping every note back to its item/commit/decision, and remembers each release in a release-log. On projects with a configured screenshot/quicksheet skill, also illustrates shipped features with annotated images before rendering the PDF.'
 argument-hint: '[<version/folders> | auto|auto-pilot <version/folders> | direct <version/folders>] — a version label (e.g. v0.7.3) and/or the folder(s) holding the shipped work. Optional — the skill will ask what is in the release if omitted. See "Run modes" for the auto-pilot/direct tokens.'
 allowed-tools:
   - Read
@@ -207,6 +207,68 @@ contract).
   `GREEN-WITH-CAVEATS` / QA-debt markers and records any in the crosswalk
   for SHIP-gate disclosure (see release-lead.md, verification item 5).
 
+### Step 3.5 — Illustrate the release (project-specific, optional)
+Some projects maintain their own screenshot/quicksheet-generation skill for
+turning a shipped feature into a client-shareable annotated image (e.g. a
+project's `release-quicksheets` skill). This step exists so illustrated
+release notes are a standing part of the pipeline for projects that have
+one, without team-release hard-depending on any project-specific tooling.
+
+- Check `PROJECT-CONTEXT.md` for a **"Release illustration skill"** entry
+  (or equivalent — grep for "quicksheet"/"release illustration"/"screenshot
+  skill" if the heading varies). If none is configured, **skip this step
+  entirely and say so in the Step 4 report** — this is the common case for
+  most projects and is not a gap to apologize for.
+- If one is configured, invoke it once per client-facing feature section in
+  the finalized `release-notes.md` (its own SKILL.md defines which sections
+  warrant an image vs. which to skip — e.g. a wording-only fix usually
+  doesn't need one; trust that skill's own judgment call, but if a feature
+  clearly changes a visible UI surface and the illustration skill skipped
+  it, ask before accepting the omission). For a feature already illustrated
+  in an earlier, unsent release that this release is superseding/folding in
+  (see "Re-entry passes" and the client firewall on combined releases),
+  reuse that existing image rather than regenerating it if the underlying
+  UI hasn't changed since — regenerating identical content wastes the
+  (often substantial) live-screenshot work for no benefit.
+- 🟧🟧🟧 HUMAN GATE REQUIRED 🟧🟧🟧 — **PREFERENCE gate.** Once images exist,
+  confirm with the user before wiring `![alt](images/<slug>.png)` references
+  into `release-notes.md` — the illustration skill's own convention is to
+  ask before editing release notes unprompted, and that gate still applies
+  here even though it's now a standing pipeline step. **Under auto-pilot,**
+  skip the ask: wire the images in automatically and log the choice as
+  `DECIDED-AUTO`, since this step only ever adds supporting visuals to
+  already-approved text, never changes a claim.
+- After wiring images in, do a final jargon/consistency check on the added
+  `alt` text and any figure captions — the illustration skill strips UI
+  chrome and internal ids from its own output, but doesn't know this
+  project's specific jargon list.
+
+### Step 3.6 — Render the client PDF
+Always runs (no project-specific dependency) — a release isn't done until
+there's a clean, shareable PDF alongside the markdown, since some clients
+expect an attachment rather than a link.
+
+```bash
+python3 ~/.claude/skills/team-release/scripts/render_release_pdf.py \
+  <output-dir>/release-notes.md \
+  <output-dir>/release-notes.pdf
+```
+
+(Under a plugin install, the script path follows the same "Path note"
+translation as everywhere else in this file.) The script embeds every local
+image the notes reference (including any wired in at Step 3.5) as base64 so
+the PDF is fully self-contained — no external file references, safe to
+email or archive on its own. It renders via a fixed, professional default
+style (a single `--accent <hex>` flag exists for light per-project color
+tuning; don't hand-roll a second rendering path — extend this script's CSS
+if a project genuinely needs more).
+
+Re-render this step **any time `release-notes.md` changes after this
+point** — a redraft, a Step 4.5-style correction, or a later re-entry pass
+that repairs a line all leave a stale PDF behind if this step isn't re-run.
+Treat the PDF as generated output, not a hand-maintained artifact: never
+edit it directly.
+
 ### Step 4 — Report back
 Summarize for the user in chat:
 - The **version** and the **items** bundled into it.
@@ -220,8 +282,12 @@ Summarize for the user in chat:
   confirmation it was recorded in the project's defect catalog (if one is
   configured).
 - Confirmation the notes are **jargon-clean** and **version-correct**.
-- Links to `release-notes.md` (the deliverable) and `release-crosswalk.md`
-  (internal).
+- Whether this release was illustrated (Step 3.5) — which features got an
+  image, which were skipped/reused and why, or that no illustration skill
+  is configured for this project.
+- Links to `release-notes.md` (the deliverable), `release-notes.pdf` (the
+  same content, self-contained and shareable as an attachment), and
+  `release-crosswalk.md` (internal).
 - **Under auto-pilot:** also list every `DECIDED-AUTO` entry from this run —
   "Decided automatically (auto-pilot): N items — see decisions.md."
 
@@ -283,15 +349,21 @@ before asking, DECIDED after.
   confirmed scope.
 - **Output per release:** `<release-docs-root>/<version>/` (per
   `PROJECT-CONTEXT.md`, or the generic default) containing `release-notes.md`
-  (client-facing), `release-crosswalk.md` (private), and optionally
-  `decisions.md`.
+  (client-facing), `release-notes.pdf` (same content, self-contained,
+  Step 3.6), `release-crosswalk.md` (private), optionally `decisions.md`,
+  and — only for projects with a configured illustration skill — an
+  `images/` folder of feature screenshots referenced from the notes.
 - **Templates:** `~/.claude/skills/team-release/templates/` — Step 2 seeds
   both documents from them; they are the structural standard.
 - **Scripts:** `~/.claude/skills/team-release/scripts/` —
   `verify_commits.py` (per-SHA existence/ancestry/date/diffstat + a `range`
   sweep; the mechanical half of the lead's fact-check),
-  `jargon_lint.py` (the regex half of the jargon sweep), and
-  `append_release_log_row.py` (the only way release-log rows are written).
+  `jargon_lint.py` (the regex half of the jargon sweep),
+  `append_release_log_row.py` (the only way release-log rows are written),
+  and `render_release_pdf.py` (Step 3.6 — markdown + embedded local images
+  → a self-contained client PDF via headless Chrome; generic, no
+  project-specific dependency, requires the `markdown` pip package and a
+  local Chrome/Chromium install).
 - **Memory:** the release-log location comes from `PROJECT-CONTEXT.md` if the
   project names one; otherwise
   `~/.claude/skills/team-release/memory/release-log.md` (a cross-project

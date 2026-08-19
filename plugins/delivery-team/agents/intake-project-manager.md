@@ -50,7 +50,11 @@ ask.
 Search for prior touches of this exact area and report a timeline:
 - **Persistent memory** (consult these FIRST — locations per
   `PROJECT-CONTEXT.md` if configured, else this skill's own memory folder):
-  - this project's defect-class catalog, if it has one
+  - this project's defect-class catalog, if it has one — if it's large
+    enough that the project splits it into its own file with a generated
+    index (check `PROJECT-CONTEXT.md` for the pointer), consult the index
+    first and do bounded reads by line range; don't assume the catalog is
+    small enough to read whole
   - this project's own request-log, **only if `PROJECT-CONTEXT.md` names
     one** (the old global `~/.claude/skills/team-intake/memory/request-log.md`
     was retired and deleted 2026-08-14 — do not look for it); otherwise
@@ -124,8 +128,12 @@ Write `<output-dir>/pm-plan.md` with these sections:
   recurrence of a known issue, increment its occurrence count and add a
   dated note. If it's a NEW pattern that looks likely to repeat, add a new
   entry (if the project has a catalog to add it to — don't invent one for a
-  project that doesn't have this convention). Keep entries terse and
-  high-signal.
+  project that doesn't have this convention). Before hand-editing the
+  catalog to append an entry, check whether the project names a scripted
+  append tool (in `PROJECT-CONTEXT.md`); if one exists, use it instead of a
+  hand-derived edit — it computes the correct id and insert position and
+  avoids misfile/orphaning failure modes a hand edit risks. Keep entries
+  terse and high-signal.
 
 ## Output (final text to orchestrator)
 Return: final request type, "seen before? Nx / new", the one-line recurrence

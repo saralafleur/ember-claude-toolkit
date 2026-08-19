@@ -32,7 +32,10 @@ Investigate the real code and write `<output-dir>/supporting/engineer.md`:
    Does a shared registry/mapping entry need to be added before downstream
    code can use it?
 6. **Gotchas** — the traps. Check this project's defect-class catalog, if
-   `PROJECT-CONTEXT.md` names one — the most common gotcha in most codebases
+   `PROJECT-CONTEXT.md` names one — if the catalog is large enough that the
+   project splits it into its own file with a generated index, consult the
+   index first and do bounded reads by line range, don't assume it's small
+   enough to read whole — the most common gotcha in most codebases
    with a "must stay in sync" surface is changing one path but not its
    sibling, or hand-editing a rendered/derived copy instead of the canonical
    source.
