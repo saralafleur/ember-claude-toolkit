@@ -46,4 +46,5 @@ any range handed down at Step 0 is a hint until the lead re-derives it)
 - Jargon-leak sweep: <clean / fixed N> (mechanical half via `jargon_lint.py`)
 - QA-debt / `GREEN-WITH-CAVEATS` on any bundled item: <none / item + caveat — surfaced at the SHIP gate>
 - Version/date check vs this project's version source of truth: <ok / corrected>
+- Client PDF: `release-notes-<MM>-<mm>-<pp>.pdf` (named for the release, e.g. v0.8.0 → `release-notes-00-08-00.pdf`; every reference — runbook, release-log, email — uses this full name, never a bare `release-notes.pdf`)
 - Status this pass: <HOLD — <reason> / CLEARED / SENT <YYYY-MM-DD>> (mirrors this pass's release-log row)
