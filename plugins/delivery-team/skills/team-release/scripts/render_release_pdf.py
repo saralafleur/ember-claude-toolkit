@@ -6,7 +6,12 @@ with any images it references embedded inline.
 Usage:
     python3 render_release_pdf.py <release-notes.md> [<output.pdf>] [--accent '#0b5fff']
 
-If <output.pdf> is omitted, writes "<release-notes-dir>/release-notes.pdf".
+If <output.pdf> is omitted, the PDF is named for the release it covers, so the
+file alone says which version it is: when the release-notes folder is named
+like a version (`v0.8.0`, `0.8.0`, `v1.2.3-rc1`), it writes
+"<release-notes-dir>/release-notes-00-08-00.pdf" -- each of major, minor and
+patch as two zero-padded digits. Any other folder name falls back to
+"<release-notes-dir>/release-notes.pdf". An explicit <output.pdf> always wins.
 --accent (optional) is a single hex color used for headings/rules/links --
 the rest of the palette (paper, ink, borders) stays a fixed, neutral,
 print-friendly default so this looks professional on any project without
@@ -187,6 +192,18 @@ def render_pdf(md_path, out_path, accent):
     print(f"Wrote {out_path}")
 
 
+_VERSION_DIR = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$")
+
+
+def default_pdf_name(md_path: Path) -> str:
+    """`release-notes-MM-mm-pp.pdf` when the notes live in a version-named folder
+    (v0.8.0 -> release-notes-00-08-00.pdf), else plain `release-notes.pdf`."""
+    m = _VERSION_DIR.match(md_path.resolve().parent.name)
+    if not m:
+        return "release-notes.pdf"
+    return "release-notes-" + "-".join(f"{int(part):02d}" for part in m.groups()) + ".pdf"
+
+
 if __name__ == "__main__":
     raw = sys.argv[1:]
     if not raw:
@@ -210,5 +227,5 @@ if __name__ == "__main__":
     if not positional:
         sys.exit(__doc__)
     md_arg = Path(positional[0])
-    out_arg = positional[1] if len(positional) > 1 else md_arg.with_name("release-notes.pdf")
+    out_arg = positional[1] if len(positional) > 1 else md_arg.with_name(default_pdf_name(md_arg))
     render_pdf(md_arg, out_arg, accent)

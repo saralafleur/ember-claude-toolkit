@@ -1,6 +1,6 @@
 ---
 name: team-release
-description: 'Run a small virtual release team (release-scribe, release-lead) over everything that shipped in a version and produce a client-facing release-notes.md plus a self-contained release-notes.pdf — on any project. Use when: one or more team-build runs are done (verified green) and you want to tell the client what changed; you are cutting a version and need plain-language notes for a non-technical client; you want to bundle several work items into ONE client release doc; or you need release notes that are fact-checked against the actual shipped commits, not just what a report claimed. Produces client-facing release-notes.md + release-notes.pdf (images embedded, self-contained), a private crosswalk mapping every note back to its item/commit/decision, and remembers each release in a release-log. On projects with a configured screenshot/quicksheet skill, also illustrates shipped features with annotated images before rendering the PDF.'
+description: 'Run a small virtual release team (release-scribe, release-lead) over everything that shipped in a version and produce a client-facing release-notes.md plus a self-contained client PDF named for its release (release-notes-MM-mm-pp.pdf, e.g. release-notes-00-08-00.pdf for v0.8.0) — on any project. Use when: one or more team-build runs are done (verified green) and you want to tell the client what changed; you are cutting a version and need plain-language notes for a non-technical client; you want to bundle several work items into ONE client release doc; or you need release notes that are fact-checked against the actual shipped commits, not just what a report claimed. Produces client-facing release-notes.md + release-notes-MM-mm-pp.pdf (images embedded, self-contained), a private crosswalk mapping every note back to its item/commit/decision, and remembers each release in a release-log. On projects with a configured screenshot/quicksheet skill, also illustrates shipped features with annotated images before rendering the PDF.'
 argument-hint: '[<version/folders> | auto|auto-pilot <version/folders> | direct <version/folders>] — a version label (e.g. v0.7.3) and/or the folder(s) holding the shipped work. Optional — the skill will ask what is in the release if omitted. See "Run modes" for the auto-pilot/direct tokens.'
 allowed-tools:
   - Read
@@ -250,9 +250,19 @@ expect an attachment rather than a link.
 
 ```bash
 python3 ~/.claude/skills/team-release/scripts/render_release_pdf.py \
-  <output-dir>/release-notes.md \
-  <output-dir>/release-notes.pdf
+  <output-dir>/release-notes.md
 ```
+
+**PDF name = the release (standing convention, 2026-09-25).** With no output
+path, the script names the PDF for the release so the file alone says which
+version it is: in a version-named folder (`v0.8.0`) it writes
+`<output-dir>/release-notes-00-08-00.pdf`, with major, minor and patch each as
+two zero-padded digits. Keep the release folder named `v<major>.<minor>.<patch>`
+so this works; any other folder name falls back to `release-notes.pdf`. Only
+pass an explicit output path if a project's convention differs. Everywhere the
+PDF is mentioned afterwards (the crosswalk, a deploy runbook's "send to the
+client" line, the release-log row, the report back to the user) uses that full
+file name, never a bare `release-notes.pdf`.
 
 (Under a plugin install, the script path follows the same "Path note"
 translation as everywhere else in this file.) The script embeds every local
@@ -285,7 +295,7 @@ Summarize for the user in chat:
 - Whether this release was illustrated (Step 3.5) — which features got an
   image, which were skipped/reused and why, or that no illustration skill
   is configured for this project.
-- Links to `release-notes.md` (the deliverable), `release-notes.pdf` (the
+- Links to `release-notes.md` (the deliverable), `release-notes-MM-mm-pp.pdf` (the
   same content, self-contained and shareable as an attachment), and
   `release-crosswalk.md` (internal).
 - **Under auto-pilot:** also list every `DECIDED-AUTO` entry from this run —
@@ -349,7 +359,7 @@ before asking, DECIDED after.
   confirmed scope.
 - **Output per release:** `<release-docs-root>/<version>/` (per
   `PROJECT-CONTEXT.md`, or the generic default) containing `release-notes.md`
-  (client-facing), `release-notes.pdf` (same content, self-contained,
+  (client-facing), `release-notes-MM-mm-pp.pdf` (same content, self-contained,
   Step 3.6), `release-crosswalk.md` (private), optionally `decisions.md`,
   and — only for projects with a configured illustration skill — an
   `images/` folder of feature screenshots referenced from the notes.
